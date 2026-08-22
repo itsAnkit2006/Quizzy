@@ -448,51 +448,102 @@ const submitQuiz = async (req, res) => {
 };
 
 const getAttemptResult = async (req, res) => {
-  try {
-    const { shareCode, attemptId } = req.params;
+    try {
+        const { shareCode, attemptId } = req.params;
 
-    const quiz = await Quiz.findOne({
-      shareCode: shareCode.toUpperCase(),
-    }).select("title shareCode");
+        const quiz = await Quiz.findOne({
+            shareCode: shareCode.toUpperCase(),
+        }).lean();
 
-    if (!quiz) {
-      return res.status(404).json({
-        message: "Quiz not found.",
-      });
+        if (!quiz) {
+            return res.status(404).json({
+                message: "Quiz not found.",
+            });
+        }
+
+        const attempt = await Attempt.findOne({
+            _id: attemptId,
+            quiz: quiz._id,
+            user: req.user._id,
+            status: "completed",
+        }).lean();
+
+        if (!attempt) {
+            return res.status(404).json({
+                message: "Result not found.",
+            });
+        }
+
+        const answers = quiz.questions.map(
+            (question, index) => {
+                const submitted = attempt.answers.find(
+                    (answer) =>
+                        String(answer.questionId) ===
+                        String(question._id)
+                );
+
+                const selectedAnswer =
+                    submitted?.selectedAnswer ?? null;
+
+                let result = "unanswered";
+
+                if (selectedAnswer !== null) {
+                    result =
+                        selectedAnswer ===
+                        question.correctAnswer
+                            ? "correct"
+                            : "wrong";
+                }
+
+                return {
+                    number: index + 1,
+
+                    question: question.question,
+
+                    options: question.options,
+
+                    selectedAnswer,
+
+                    correctAnswer:
+                        question.correctAnswer,
+
+                    result,
+                };
+            }
+        );
+
+        res.json({
+            result: {
+                attemptId: attempt._id,
+                quizTitle: quiz.title,
+
+                correctAnswers:
+                    attempt.correctAnswers,
+
+                wrongAnswers:
+                    attempt.wrongAnswers,
+
+                unanswered:
+                    attempt.unanswered,
+
+                score: attempt.score,
+
+                timeTaken:
+                    attempt.timeTaken,
+
+                submittedAt:
+                    attempt.submittedAt,
+
+                answers,
+            },
+        });
+    } catch (error) {
+        console.error("Get result error:", error);
+
+        res.status(500).json({
+            message: "Unable to load result.",
+        });
     }
-
-    const attempt = await Attempt.findOne({
-      _id: attemptId,
-      quiz: quiz._id,
-      user: req.user._id,
-      status: "completed",
-    });
-
-    if (!attempt) {
-      return res.status(404).json({
-        message: "Result not found.",
-      });
-    }
-
-    res.json({
-      result: {
-        attemptId: attempt._id,
-        quizTitle: quiz.title,
-        correctAnswers: attempt.correctAnswers,
-        wrongAnswers: attempt.wrongAnswers,
-        unanswered: attempt.unanswered,
-        score: attempt.score,
-        timeTaken: attempt.timeTaken,
-        submittedAt: attempt.submittedAt,
-      },
-    });
-  } catch (error) {
-    console.error("Get result error:", error);
-
-    res.status(500).json({
-      message: "Unable to load result.",
-    });
-  }
 };
 
 const getMyResults = async (req, res) => {
