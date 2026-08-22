@@ -9,6 +9,7 @@ function QuizResult() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -46,6 +47,15 @@ function QuizResult() {
 
     return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
   };
+
+  const filteredAnswers =
+    result?.answers?.filter((answer) => {
+      if (activeFilter === "all") {
+        return true;
+      }
+
+      return answer.result === activeFilter;
+    }) || [];
 
   if (loading) {
     return (
@@ -154,7 +164,15 @@ function QuizResult() {
 
         {/* Result stats */}
         <section className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveFilter("correct")}
+            className={`rounded-2xl border p-4 text-center shadow-sm transition ${
+              activeFilter === "correct"
+                ? "border-green-300 bg-green-50 ring-2 ring-green-100"
+                : "border-slate-200 bg-white hover:bg-slate-50"
+            }`}
+          >
             <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-green-50 text-sm font-bold text-green-600">
               ✓
             </div>
@@ -164,9 +182,17 @@ function QuizResult() {
             </p>
 
             <p className="mt-1 text-xs font-medium text-slate-500">Correct</p>
-          </div>
+          </button>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveFilter("wrong")}
+            className={`rounded-2xl border p-4 text-center shadow-sm transition ${
+              activeFilter === "wrong"
+                ? "border-red-300 bg-red-50 ring-2 ring-red-100"
+                : "border-slate-200 bg-white hover:bg-slate-50"
+            }`}
+          >
             <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-red-50 text-sm font-bold text-red-600">
               ×
             </div>
@@ -176,9 +202,17 @@ function QuizResult() {
             </p>
 
             <p className="mt-1 text-xs font-medium text-slate-500">Wrong</p>
-          </div>
+          </button>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm">
+          <button
+            type="button"
+            onClick={() => setActiveFilter("unanswered")}
+            className={`rounded-2xl border p-4 text-center shadow-sm transition ${
+              activeFilter === "unanswered"
+                ? "border-slate-400 bg-slate-100 ring-2 ring-slate-200"
+                : "border-slate-200 bg-white hover:bg-slate-50"
+            }`}
+          >
             <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-500">
               —
             </div>
@@ -188,6 +222,135 @@ function QuizResult() {
             </p>
 
             <p className="mt-1 text-xs font-medium text-slate-500">Skipped</p>
+          </button>
+        </section>
+
+        {/* Question Review */}
+        <section className="mt-6">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Question Review
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                {activeFilter === "correct" && "Showing your correct answers."}
+
+                {activeFilter === "wrong" &&
+                  "Showing your wrong answers and the correct answers."}
+
+                {activeFilter === "unanswered" &&
+                  "Showing questions you skipped."}
+
+                {activeFilter === "all" && "Review all of your answers."}
+              </p>
+            </div>
+
+            {activeFilter !== "all" && (
+              <button
+                type="button"
+                onClick={() => setActiveFilter("all")}
+                className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-900"
+              >
+                Show All
+              </button>
+            )}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {filteredAnswers.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <p className="text-sm text-slate-500">
+                  No questions in this category.
+                </p>
+              </div>
+            ) : (
+              filteredAnswers.map((answer) => {
+                const isCorrect = answer.result === "correct";
+
+                const isWrong = answer.result === "wrong";
+
+                const isUnanswered = answer.result === "unanswered";
+
+                return (
+                  <div
+                    key={answer.number}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                  >
+                    {/* Question */}
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">
+                        {answer.number}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-6 text-slate-900">
+                          {answer.question}
+                        </p>
+                      </div>
+
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          isCorrect
+                            ? "bg-green-50 text-green-600"
+                            : isWrong
+                              ? "bg-red-50 text-red-600"
+                              : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {isCorrect ? "Correct" : isWrong ? "Wrong" : "Skipped"}
+                      </span>
+                    </div>
+
+                    {/* Your Answer */}
+                    <div className="mt-5">
+                      <p className="text-xs font-medium text-slate-500">
+                        Your answer
+                      </p>
+
+                      {isUnanswered ? (
+                        <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <p className="text-sm font-medium text-slate-400">
+                            Not answered
+                          </p>
+                        </div>
+                      ) : (
+                        <div
+                          className={`mt-2 rounded-xl border px-4 py-3 ${
+                            isCorrect
+                              ? "border-green-200 bg-green-50"
+                              : "border-red-200 bg-red-50"
+                          }`}
+                        >
+                          <p
+                            className={`text-sm font-medium ${
+                              isCorrect ? "text-green-700" : "text-red-700"
+                            }`}
+                          >
+                            {answer.options[answer.selectedAnswer]}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Correct Answer */}
+                    {!isCorrect && (
+                      <div className="mt-4">
+                        <p className="text-xs font-medium text-slate-500">
+                          Correct answer
+                        </p>
+
+                        <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                          <p className="text-sm font-medium text-green-700">
+                            {answer.options[answer.correctAnswer]}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </section>
 
@@ -231,115 +394,6 @@ function QuizResult() {
                 </span>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Question Review */}
-        <section className="mt-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              Question Review
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Review your answers and see the correct answers.
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {result.answers.map((answer) => {
-              const isCorrect = answer.result === "correct";
-
-              const isWrong = answer.result === "wrong";
-
-              const isUnanswered = answer.result === "unanswered";
-
-              return (
-                <div
-                  key={answer.number}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  {/* Question header */}
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">
-                      {answer.number}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold leading-6 text-slate-900">
-                        {answer.question}
-                      </p>
-                    </div>
-
-                    <div className="shrink-0">
-                      {isCorrect && (
-                        <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-600">
-                          Correct
-                        </span>
-                      )}
-
-                      {isWrong && (
-                        <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600">
-                          Wrong
-                        </span>
-                      )}
-
-                      {isUnanswered && (
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
-                          Skipped
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Your answer */}
-                  <div className="mt-5">
-                    <p className="text-xs font-medium text-slate-500">
-                      Your answer
-                    </p>
-
-                    {answer.selectedAnswer === null ? (
-                      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-sm font-medium text-slate-400">
-                          Not answered
-                        </p>
-                      </div>
-                    ) : (
-                      <div
-                        className={`mt-2 rounded-xl border px-4 py-3 ${
-                          isCorrect
-                            ? "border-green-200 bg-green-50"
-                            : "border-red-200 bg-red-50"
-                        }`}
-                      >
-                        <p
-                          className={`text-sm font-medium ${
-                            isCorrect ? "text-green-700" : "text-red-700"
-                          }`}
-                        >
-                          {answer.options[answer.selectedAnswer]}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Correct answer */}
-                  {!isCorrect && (
-                    <div className="mt-4">
-                      <p className="text-xs font-medium text-slate-500">
-                        Correct answer
-                      </p>
-
-                      <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                        <p className="text-sm font-medium text-green-700">
-                          {answer.options[answer.correctAnswer]}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </section>
 
