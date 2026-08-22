@@ -2,331 +2,301 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 function Home() {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
 
-  const [shareCode, setShareCode] = useState("");
-  const [error, setError] = useState("");
+    const [shareCode, setShareCode] = useState("");
+    const [error, setError] = useState("");
 
-  const user = JSON.parse(localStorage.getItem("user"));
+    const token = localStorage.getItem("token");
 
-  const handleJoinQuiz = (e) => {
-    e.preventDefault();
+    let user = null;
 
-    const code = shareCode.trim().toUpperCase();
-
-    if (!code) {
-      setError("Please enter a quiz code.");
-      return;
+    try {
+        user = JSON.parse(localStorage.getItem("user"));
+    } catch {
+        user = null;
     }
 
-    setError("");
+    const handleJoinQuiz = (event) => {
+        event.preventDefault();
 
-    navigate(`/quiz/${code}`);
-  };
+        const code = shareCode.trim().toUpperCase();
 
-  const handleCreateQuiz = () => {
-    if (user) {
-      navigate("/admin/create");
-    } else {
-      navigate("/register");
-    }
-  };
+        if (!code) {
+            setError("Please enter a quiz code.");
+            return;
+        }
 
-  return (
-    <div className="min-h-screen bg-white">
-      {/* Navbar */}
-      <nav className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link
-            to="/"
-            className="text-2xl font-bold tracking-tight text-slate-900"
-          >
-            Quizzy
-          </Link>
+        setError("");
+        navigate(`/quiz/${code}`);
+    };
 
-          <div className="flex items-center gap-2">
-            {user ? (
-              <Link
-                to="/dashboard"
-                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  to="/login"
-                  className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+    return (
+        <div className="min-h-screen bg-white text-slate-900">
+
+            {/* Navbar */}
+            <nav className="border-b border-slate-200 bg-white">
+                <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+
+                    <Link
+                        to="/"
+                        className="text-2xl font-bold tracking-tight text-slate-900"
+                    >
+                        Quizzy
+                    </Link>
+
+                    <div className="flex items-center gap-2">
+
+                        {token ? (
+                            <>
+                                <Link
+                                    to="/dashboard"
+                                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100"
+                                >
+                                    Dashboard
+                                </Link>
+
+                                {user?.role === "admin" && (
+                                    <Link
+                                        to="/admin"
+                                        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                                    >
+                                        Admin Panel
+                                    </Link>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    to="/login"
+                                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                                >
+                                    Login
+                                </Link>
+
+                                <Link
+                                    to="/register"
+                                    className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+                                >
+                                    Register
+                                </Link>
+                            </>
+                        )}
+
+                    </div>
+                </div>
+            </nav>
+
+            <main>
+
+                {/* Hero */}
+                <section className="px-5 pb-20 pt-16 sm:pt-24">
+                    <div className="mx-auto max-w-4xl text-center">
+
+                        <div className="mb-5 inline-flex rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
+                            Simple. Fast. Competitive.
+                        </div>
+
+                        <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
+                            Test your knowledge.
+                            <br />
+
+                            <span className="text-slate-500">
+                                Compete with others.
+                            </span>
+                        </h1>
+
+                        <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-500 sm:text-lg">
+                            Join quizzes using a unique code, challenge
+                            yourself against the clock, and see how you
+                            rank on the leaderboard.
+                        </p>
+
+                        <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    document
+                                        .getElementById("join-quiz")
+                                        ?.scrollIntoView({
+                                            behavior: "smooth",
+                                        });
+                                }}
+                                className="rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            >
+                                Join a Quiz
+                            </button>
+
+                            <Link
+                                to={token ? "/dashboard" : "/login"}
+                                className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            >
+                                {token ? "Go to Dashboard" : "Login"}
+                            </Link>
+
+                        </div>
+                    </div>
+                </section>
+
+                {/* Join Quiz */}
+                <section
+                    id="join-quiz"
+                    className="border-y border-slate-200 bg-slate-50 px-5 py-16"
                 >
-                  Login
-                </Link>
+                    <div className="mx-auto max-w-xl text-center">
 
-                <Link
-                  to="/register"
-                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Register
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+                        <p className="text-sm font-medium text-slate-500">
+                            Have a quiz code?
+                        </p>
 
-      <main>
-        {/* Hero */}
-        <section className="px-5 pb-20 pt-16 sm:pb-24 sm:pt-24">
-          <div className="mx-auto max-w-4xl text-center">
-            <div className="mb-5 inline-flex rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-600">
-              Simple. Fast. Competitive.
-            </div>
+                        <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                            Join a Quiz
+                        </h2>
 
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 sm:text-6xl">
-              Create.
-              <br />
-              <span className="text-slate-500">
-                Share. Compete.
-              </span>
-            </h1>
+                        <p className="mt-3 text-sm leading-6 text-slate-500">
+                            Enter the unique code shared by the quiz creator
+                            to start your quiz.
+                        </p>
 
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-500 sm:text-lg">
-              Quizzy makes it easy to create quizzes, share them
-              with others, and compete on the leaderboard.
-            </p>
+                        <form
+                            onSubmit={handleJoinQuiz}
+                            className="mt-6"
+                        >
+                            <div className="flex flex-col gap-3 sm:flex-row">
 
-            {/* Main actions */}
-            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleCreateQuiz}
-                className="rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Create a Quiz
-              </button>
+                                <input
+                                    type="text"
+                                    value={shareCode}
+                                    onChange={(event) => {
+                                        setShareCode(
+                                            event.target.value.toUpperCase()
+                                        );
+                                        setError("");
+                                    }}
+                                    placeholder="Enter quiz code"
+                                    maxLength={20}
+                                    className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-center text-sm font-semibold uppercase tracking-widest text-slate-900 outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+                                />
 
-              <a
-                href="#join"
-                className="rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Join a Quiz
-              </a>
-            </div>
-          </div>
-        </section>
+                                <button
+                                    type="submit"
+                                    className="rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                >
+                                    Join Quiz
+                                </button>
 
-        {/* Join Quiz */}
-        <section
-          id="join"
-          className="border-y border-slate-200 bg-slate-50 px-5 py-16"
-        >
-          <div className="mx-auto max-w-xl">
-            <div className="text-center">
-              <p className="text-sm font-semibold text-slate-500">
-                Have a quiz code?
-              </p>
+                            </div>
 
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-                Join a Quiz
-              </h2>
+                            {error && (
+                                <p className="mt-3 text-sm text-red-500">
+                                    {error}
+                                </p>
+                            )}
+                        </form>
 
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Enter the code shared by your quiz creator.
-              </p>
-            </div>
+                    </div>
+                </section>
 
-            <form
-              onSubmit={handleJoinQuiz}
-              className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  type="text"
-                  value={shareCode}
-                  onChange={(e) => {
-                    setShareCode(
-                      e.target.value.toUpperCase(),
-                    );
-                    setError("");
-                  }}
-                  placeholder="Enter quiz code"
-                  maxLength={20}
-                  autoComplete="off"
-                  className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3.5 text-sm font-semibold uppercase tracking-wider outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-                />
+                {/* Features */}
+                <section className="px-5 py-16">
+                    <div className="mx-auto max-w-6xl">
 
-                <button
-                  type="submit"
-                  className="rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  Join Quiz
-                </button>
-              </div>
+                        <div className="mb-10 text-center">
+                            <p className="text-sm font-medium text-slate-500">
+                                Everything you need
+                            </p>
 
-              {error && (
-                <p className="mt-3 text-sm font-medium text-red-600">
-                  {error}
+                            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                                Quizzy is built for competition.
+                            </h2>
+                        </div>
+
+                        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+                            <Feature
+                                number="01"
+                                title="Join a Quiz"
+                                description="Enter a quiz code shared by a quiz creator and start testing your knowledge."
+                            />
+
+                            <Feature
+                                number="02"
+                                title="Track Your Results"
+                                description="Review your score, correct answers, wrong answers, unanswered questions and completion time."
+                            />
+
+                            <Feature
+                                number="03"
+                                title="Compete"
+                                description="Compare your performance with other participants on the quiz leaderboard."
+                            />
+
+                        </div>
+                    </div>
+                </section>
+
+                {/* Admin Section */}
+                {user?.role === "admin" && (
+                    <section className="border-t border-slate-200 bg-slate-50 px-5 py-16">
+                        <div className="mx-auto max-w-4xl text-center">
+
+                            <p className="text-sm font-medium text-slate-500">
+                                Quiz Creator
+                            </p>
+
+                            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                                Manage your quizzes.
+                            </h2>
+
+                            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-500">
+                                Create quizzes, manage questions, review
+                                participant performance and analyze results
+                                from the admin dashboard.
+                            </p>
+
+                            <Link
+                                to="/admin"
+                                className="mt-6 inline-block rounded-xl bg-slate-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            >
+                                Open Admin Panel
+                            </Link>
+
+                        </div>
+                    </section>
+                )}
+
+            </main>
+
+            {/* Footer */}
+            <footer className="border-t border-slate-200 bg-white px-5 py-6">
+                <p className="text-center text-sm text-slate-500">
+                    © {new Date().getFullYear()} Quizzy. All rights reserved.
                 </p>
-              )}
-            </form>
-          </div>
-        </section>
+            </footer>
 
-        {/* Features */}
-        <section className="px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <div className="mx-auto max-w-2xl text-center">
-              <p className="text-sm font-semibold text-slate-500">
-                Everything you need
-              </p>
+        </div>
+    );
+}
 
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                Built for simple quizzes
-              </h2>
+function Feature({ number, title, description }) {
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
 
-              <p className="mt-3 text-sm leading-6 text-slate-500">
-                Create, share and analyze quizzes without unnecessary
-                complexity.
-              </p>
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600">
+                {number}
             </div>
 
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Feature
-                number="01"
-                title="Create Quizzes"
-                description="Build custom quizzes with questions, multiple-choice options, duration and negative marking."
-              />
-
-              <Feature
-                number="02"
-                title="Share Instantly"
-                description="Every quiz gets a unique share code that you can send directly to your participants."
-              />
-
-              <Feature
-                number="03"
-                title="Track Results"
-                description="View scores, completion times, leaderboards and question-by-question performance."
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section className="border-t border-slate-200 bg-slate-50 px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-5xl">
-            <div className="text-center">
-              <p className="text-sm font-semibold text-slate-500">
-                How it works
-              </p>
-
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                Four simple steps
-              </h2>
-            </div>
-
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Step
-                number="1"
-                title="Create"
-                description="Build your quiz with your own questions."
-              />
-
-              <Step
-                number="2"
-                title="Share"
-                description="Send the generated quiz code to participants."
-              />
-
-              <Step
-                number="3"
-                title="Compete"
-                description="Participants answer questions against the clock."
-              />
-
-              <Step
-                number="4"
-                title="Analyze"
-                description="Check scores and detailed quiz performance."
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* CTA */}
-        <section className="px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-3xl rounded-3xl bg-slate-900 px-6 py-12 text-center sm:px-10">
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Ready to create your first quiz?
+            <h2 className="mt-5 text-lg font-semibold text-slate-900">
+                {title}
             </h2>
 
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-400">
-              Create a quiz, share it with your friends or classmates,
-              and see who comes out on top.
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+                {description}
             </p>
 
-            <button
-              type="button"
-              onClick={handleCreateQuiz}
-              className="mt-6 rounded-xl bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-            >
-              Get Started
-            </button>
-          </div>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white px-5 py-6">
-        <p className="text-center text-sm text-slate-500">
-          © {new Date().getFullYear()} Quizzy. All rights reserved.
-        </p>
-      </footer>
-    </div>
-  );
-}
-
-function Feature({
-  number,
-  title,
-  description,
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <span className="text-xs font-bold tracking-widest text-slate-400">
-        {number}
-      </span>
-
-      <h3 className="mt-4 text-lg font-bold text-slate-900">
-        {title}
-      </h3>
-
-      <p className="mt-2 text-sm leading-6 text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-function Step({
-  number,
-  title,
-  description,
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
-        {number}
-      </div>
-
-      <h3 className="mt-4 text-sm font-bold text-slate-900">
-        {title}
-      </h3>
-
-      <p className="mt-2 text-sm leading-6 text-slate-500">
-        {description}
-      </p>
-    </div>
-  );
+        </div>
+    );
 }
 
 export default Home;
