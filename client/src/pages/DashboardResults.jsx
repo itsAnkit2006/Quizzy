@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -9,40 +9,34 @@ function DashboardResults() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      try {
-        const response = await api.get("/quizzes/my/results");
+  const fetchResults = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-        setResults(response.data.results || []);
-      } catch (error) {
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+    try {
+      const response = await api.get("/quizzes/my/results");
 
-          navigate("/login");
-          return;
-        }
-
-        setError(
+      setResults(response.data.results || []);
+    } catch (error) {
+      setError(
+        error.userMessage ||
           error.response?.data?.message ||
-            "Unable to load your results.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+          "Unable to load your results.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
+  useEffect(() => {
     fetchResults();
-  }, [navigate]);
+  }, [fetchResults]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
 
-    return `${minutes}m ${String(
-      remainingSeconds,
-    ).padStart(2, "0")}s`;
+    return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
   };
 
   const formatDate = (date) => {
@@ -50,22 +44,17 @@ function DashboardResults() {
       return "Unknown date";
     }
 
-    return new Date(date).toLocaleDateString(
-      undefined,
-      {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      },
-    );
+    return new Date(date).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="text-sm text-slate-500">
-          Loading your results...
-        </p>
+        <p className="text-sm text-slate-500">Loading your results...</p>
       </div>
     );
   }
@@ -94,9 +83,7 @@ function DashboardResults() {
       <main className="mx-auto max-w-3xl px-5 py-8 sm:py-10">
         {/* Header */}
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            Your Activity
-          </p>
+          <p className="text-sm font-semibold text-slate-500">Your Activity</p>
 
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
             My Results
@@ -109,8 +96,21 @@ function DashboardResults() {
 
         {/* Error */}
         {error && (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+            <p className="text-sm font-semibold text-red-700">
+              Unable to load your results
+            </p>
+
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+
+            <button
+              type="button"
+              onClick={fetchResults}
+              disabled={loading}
+              className="mt-4 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Retrying..." : "Try Again"}
+            </button>
           </div>
         )}
 
@@ -154,8 +154,7 @@ function DashboardResults() {
                     </h2>
 
                     <p className="mt-1 text-xs text-slate-400">
-                      Completed{" "}
-                      {formatDate(result.submittedAt)}
+                      Completed {formatDate(result.submittedAt)}
                     </p>
 
                     <div className="mt-4 flex flex-wrap gap-2">
