@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
@@ -11,31 +11,30 @@ function QuizResult() {
   const [error, setError] = useState("");
   const [activeFilter, setActiveFilter] = useState(null);
 
+  const fetchResult = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await api.get(
+        `/quizzes/${shareCode}/result/${attemptId}`,
+      );
+
+      setResult(response.data.result);
+    } catch (error) {
+      setError(
+        error.userMessage ||
+          error.response?.data?.message ||
+          "Unable to load result.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [shareCode, attemptId]);
+
   useEffect(() => {
-    const fetchResult = async () => {
-      try {
-        const response = await api.get(
-          `/quizzes/${shareCode}/result/${attemptId}`,
-        );
-
-        setResult(response.data.result);
-      } catch (error) {
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-
-          navigate("/login");
-          return;
-        }
-
-        setError(error.response?.data?.message || "Unable to load result.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchResult();
-  }, [shareCode, attemptId, navigate]);
+  }, [fetchResult]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -48,11 +47,11 @@ function QuizResult() {
     return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
   };
 
-  const filteredAnswers =
-  activeFilter
-    ? result?.answers?.filter(
-        (answer) => answer.result === activeFilter
-      ) || []
+  const filteredAnswers = activeFilter
+    ? activeFilter === "all"
+      ? result?.answers || []
+      : result?.answers?.filter((answer) => answer.result === activeFilter) ||
+        []
     : [];
 
   if (loading) {
@@ -83,12 +82,23 @@ function QuizResult() {
             {error || "We couldn't load your quiz result."}
           </p>
 
-          <Link
-            to="/dashboard"
-            className="mt-6 inline-block rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-          >
-            Go to Dashboard
-          </Link>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={fetchResult}
+              disabled={loading}
+              className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Retrying..." : "Try Again"}
+            </button>
+
+            <Link
+              to="/dashboard"
+              className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -233,133 +243,138 @@ function QuizResult() {
 
         {/* Question Review */}
         {activeFilter && (
-            <section className="mt-6">
+          <section className="mt-6">
             <div className="flex items-end justify-between gap-4">
-                <div>
+              <div>
                 <h2 className="text-lg font-bold text-slate-900">
-                    Question Review
+                  Question Review
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                    {activeFilter === "correct" && "Showing your correct answers."}
+                  {activeFilter === "correct" &&
+                    "Showing your correct answers."}
 
-                    {activeFilter === "wrong" &&
+                  {activeFilter === "wrong" &&
                     "Showing your wrong answers and the correct answers."}
 
-                    {activeFilter === "unanswered" &&
+                  {activeFilter === "unanswered" &&
                     "Showing questions you skipped."}
 
-                    {activeFilter === "all" && "Review all of your answers."}
+                  {activeFilter === "all" && "Review all of your answers."}
                 </p>
-                </div>
+              </div>
 
-                {activeFilter !== "all" && (
+              {activeFilter !== "all" && (
                 <button
-                    type="button"
-                    onClick={() => setActiveFilter("all")}
-                    className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-900"
+                  type="button"
+                  onClick={() => setActiveFilter("all")}
+                  className="shrink-0 text-xs font-semibold text-slate-500 hover:text-slate-900"
                 >
-                    Show All
+                  Show All
                 </button>
-                )}
+              )}
             </div>
 
             <div className="mt-4 space-y-3">
-                {filteredAnswers.length === 0 ? (
+              {filteredAnswers.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-                    <p className="text-sm text-slate-500">
+                  <p className="text-sm text-slate-500">
                     No questions in this category.
-                    </p>
+                  </p>
                 </div>
-                ) : (
+              ) : (
                 filteredAnswers.map((answer) => {
-                    const isCorrect = answer.result === "correct";
+                  const isCorrect = answer.result === "correct";
 
-                    const isWrong = answer.result === "wrong";
+                  const isWrong = answer.result === "wrong";
 
-                    const isUnanswered = answer.result === "unanswered";
+                  const isUnanswered = answer.result === "unanswered";
 
-                    return (
+                  return (
                     <div
-                        key={answer.number}
-                        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                      key={answer.number}
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                     >
-                        {/* Question */}
-                        <div className="flex items-start gap-3">
+                      {/* Question */}
+                      <div className="flex items-start gap-3">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">
-                            {answer.number}
+                          {answer.number}
                         </div>
 
                         <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold leading-6 text-slate-900">
+                          <p className="text-sm font-semibold leading-6 text-slate-900">
                             {answer.question}
-                            </p>
+                          </p>
                         </div>
 
                         <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                             isCorrect
-                                ? "bg-green-50 text-green-600"
-                                : isWrong
+                              ? "bg-green-50 text-green-600"
+                              : isWrong
                                 ? "bg-red-50 text-red-600"
                                 : "bg-slate-100 text-slate-500"
-                            }`}
+                          }`}
                         >
-                            {isCorrect ? "Correct" : isWrong ? "Wrong" : "Skipped"}
+                          {isCorrect
+                            ? "Correct"
+                            : isWrong
+                              ? "Wrong"
+                              : "Skipped"}
                         </span>
-                        </div>
+                      </div>
 
-                        {/* Your Answer */}
-                        <div className="mt-5">
+                      {/* Your Answer */}
+                      <div className="mt-5">
                         <p className="text-xs font-medium text-slate-500">
-                            Your answer
+                          Your answer
                         </p>
 
                         {isUnanswered ? (
-                            <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                             <p className="text-sm font-medium text-slate-400">
-                                Not answered
+                              Not answered
                             </p>
-                            </div>
+                          </div>
                         ) : (
-                            <div
+                          <div
                             className={`mt-2 rounded-xl border px-4 py-3 ${
-                                isCorrect
+                              isCorrect
                                 ? "border-green-200 bg-green-50"
                                 : "border-red-200 bg-red-50"
                             }`}
-                            >
+                          >
                             <p
-                                className={`text-sm font-medium ${
+                              className={`text-sm font-medium ${
                                 isCorrect ? "text-green-700" : "text-red-700"
-                                }`}
+                              }`}
                             >
-                                {answer.options[answer.selectedAnswer]}
+                              {answer.options[answer.selectedAnswer]}
                             </p>
-                            </div>
+                          </div>
                         )}
-                        </div>
+                      </div>
 
-                        {/* Correct Answer */}
-                        {!isCorrect && (
+                      {/* Correct Answer */}
+                      {!isCorrect && (
                         <div className="mt-4">
-                            <p className="text-xs font-medium text-slate-500">
+                          <p className="text-xs font-medium text-slate-500">
                             Correct answer
-                            </p>
+                          </p>
 
-                            <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+                          <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
                             <p className="text-sm font-medium text-green-700">
-                                {answer.options[answer.correctAnswer]}
+                              {answer.options[answer.correctAnswer]}
                             </p>
-                            </div>
+                          </div>
                         </div>
-                        )}
+                      )}
                     </div>
-                    );
+                  );
                 })
-                )}
+              )}
             </div>
-            </section>
+          </section>
         )}
 
         {/* Summary */}
