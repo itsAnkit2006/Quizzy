@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
@@ -17,6 +17,18 @@ function QuizAttempt() {
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [showQuestionList, setShowQuestionList] = useState(false);
+
+  const answersRef = useRef(answers);
+  const submittingRef = useRef(submitting);
+  const submitRef = useRef(null);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  useEffect(() => {
+    submittingRef.current = submitting;
+  }, [submitting]);
 
   const questions = quiz?.questions || [];
 
@@ -84,7 +96,7 @@ function QuizAttempt() {
   }, [shareCode]);
 
   const handleSubmit = useCallback(async () => {
-    if (submitting) {
+    if (submittingRef.current) {
       return;
     }
 
@@ -95,7 +107,7 @@ function QuizAttempt() {
     try {
       const submittedAnswers = questions.map((question) => ({
         questionId: question.id,
-        selectedAnswer: answers[question.id] ?? null,
+        selectedAnswer: answersRef.current[question.id] ?? null,
       }));
 
       const response = await api.post(`/quizzes/${shareCode}/submit`, {
@@ -112,19 +124,14 @@ function QuizAttempt() {
 
       setSubmitting(false);
     }
-  }, [submitting, questions, answers, shareCode, navigate]);
+  }, [questions, shareCode, navigate]);
 
-    useEffect(() => {
+  useEffect(() => {
     fetchQuiz();
   }, [fetchQuiz]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (timeLeft === null || submitting || !quiz) {
-      return;
-    }
-
-    if (timeLeft <= 0) {
-      handleSubmit();
       return;
     }
 
@@ -132,6 +139,11 @@ function QuizAttempt() {
       setTimeLeft((previous) => {
         if (previous <= 1) {
           clearInterval(timer);
+
+          if (!submittingRef.current) {
+            submitRef.current?.();
+          }
+
           return 0;
         }
 
@@ -140,7 +152,11 @@ function QuizAttempt() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, submitting, quiz, handleSubmit]);
+  }, [quiz, submitting]);
+
+  useEffect(() => {
+    submitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
