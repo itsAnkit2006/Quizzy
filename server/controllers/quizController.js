@@ -1142,7 +1142,10 @@ const downloadCertificate = async (req, res) => {
   try {
     const { quizId, attemptId } = req.params;
 
-    // Make sure the quiz belongs to the logged-in admin
+    // =====================================================
+    // Find quiz
+    // =====================================================
+
     const quiz = await Quiz.findOne({
       _id: quizId,
       createdBy: req.user._id,
@@ -1154,7 +1157,10 @@ const downloadCertificate = async (req, res) => {
       });
     }
 
-    // Find the completed participant attempt
+    // =====================================================
+    // Find completed attempt
+    // =====================================================
+
     const attempt = await Attempt.findOne({
       _id: attemptId,
       quiz: quiz._id,
@@ -1169,24 +1175,43 @@ const downloadCertificate = async (req, res) => {
       });
     }
 
-    // Calculate maximum possible score
-    const maximumScore = quiz.questionCount * Number(quiz.positiveMarks || 0);
+    // =====================================================
+    // Calculate score
+    // =====================================================
+
+    const questionCount =
+      Number(quiz.questionCount) ||
+      quiz.questions.length;
+
+    const positiveMarks =
+      Number(quiz.positiveMarks) || 0;
+
+    const maximumScore =
+      questionCount * positiveMarks;
 
     if (maximumScore <= 0) {
       return res.status(400).json({
-        message: "Certificate cannot be generated for this quiz.",
+        message:
+          "Certificate cannot be generated for this quiz.",
       });
     }
 
-    // Calculate percentage
+    const score = Number(attempt.score || 0);
+
     const percentage = Number(
       Math.min(
         100,
-        Math.max(0, (Number(attempt.score || 0) / maximumScore) * 100),
+        Math.max(
+          0,
+          (score / maximumScore) * 100,
+        ),
       ).toFixed(1),
     );
 
+    // =====================================================
     // Certificate eligibility
+    // =====================================================
+
     if (percentage < 60) {
       return res.status(403).json({
         message:
@@ -1194,180 +1219,648 @@ const downloadCertificate = async (req, res) => {
       });
     }
 
-    const username = attempt.user?.username || "Participant";
+    // =====================================================
+    // Participant information
+    // =====================================================
+
+    const username =
+      attempt.user?.username ||
+      "Participant";
 
     const submittedDate = attempt.submittedAt
-      ? new Date(attempt.submittedAt).toLocaleDateString("en-IN", {
+      ? new Date(
+          attempt.submittedAt,
+        ).toLocaleDateString("en-IN", {
           day: "numeric",
           month: "long",
           year: "numeric",
         })
-      : new Date().toLocaleDateString("en-IN", {
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        });
+      : new Date().toLocaleDateString(
+          "en-IN",
+          {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+          },
+        );
 
-    // Create PDF
+    // =====================================================
+    // PDF
+    // =====================================================
+
+    const PDFDocument = require("pdfkit");
+
     const doc = new PDFDocument({
       size: "A4",
       layout: "landscape",
       margin: 0,
+      info: {
+        Title: "Quizzy Certificate of Achievement",
+        Author: "Quizzy",
+        Subject: `Certificate for ${username}`,
+      },
     });
-
-    const safeUsername = username.replace(/[^a-zA-Z0-9-_]/g, "_");
-
-    const filename = `Quizzy-Certificate-${safeUsername}.pdf`;
-
-    res.setHeader("Content-Type", "application/pdf");
-
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-
-    doc.pipe(res);
 
     const pageWidth = doc.page.width;
     const pageHeight = doc.page.height;
 
+    const centerX = pageWidth / 2;
+
+    // =====================================================
+    // Colors
+    // =====================================================
+
+    const NAVY = "#0f172a";
+    const DARK_NAVY = "#08111f";
+    const GOLD = "#c58b2a";
+    const LIGHT_GOLD = "#e7c477";
+    const CREAM = "#fffdf7";
+    const TEXT = "#334155";
+    const MUTED = "#64748b";
+    const BORDER = "#d7b15d";
+
+    // =====================================================
     // Background
-    doc.rect(0, 0, pageWidth, pageHeight).fill("#f8fafc");
+    // =====================================================
 
+    doc
+      .rect(
+        0,
+        0,
+        pageWidth,
+        pageHeight,
+      )
+      .fill(CREAM);
+
+    // =====================================================
+    // Decorative top-left ribbon
+    // =====================================================
+
+    doc
+      .save()
+      .fillColor(DARK_NAVY)
+      .moveTo(0, 0)
+      .lineTo(260, 0)
+      .lineTo(80, 150)
+      .lineTo(0, 190)
+      .closePath()
+      .fill()
+      .restore();
+
+    doc
+      .save()
+      .fillColor(GOLD)
+      .moveTo(260, 0)
+      .lineTo(280, 0)
+      .lineTo(85, 160)
+      .lineTo(65, 150)
+      .closePath()
+      .fill()
+      .restore();
+
+    // =====================================================
+    // Decorative bottom-right ribbon
+    // =====================================================
+
+    doc
+      .save()
+      .fillColor(DARK_NAVY)
+      .moveTo(pageWidth, pageHeight)
+      .lineTo(pageWidth - 260, pageHeight)
+      .lineTo(pageWidth - 80, pageHeight - 150)
+      .lineTo(pageWidth, pageHeight - 190)
+      .closePath()
+      .fill()
+      .restore();
+
+    doc
+      .save()
+      .fillColor(GOLD)
+      .moveTo(pageWidth - 260, pageHeight)
+      .lineTo(pageWidth - 280, pageHeight)
+      .lineTo(pageWidth - 85, pageHeight - 160)
+      .lineTo(pageWidth - 65, pageHeight - 150)
+      .closePath()
+      .fill()
+      .restore();
+
+    // =====================================================
     // Outer border
+    // =====================================================
+
     doc
-      .lineWidth(3)
-      .strokeColor("#0f172a")
-      .rect(25, 25, pageWidth - 50, pageHeight - 50)
+      .lineWidth(2)
+      .strokeColor(BORDER)
+      .roundedRect(
+        18,
+        18,
+        pageWidth - 36,
+        pageHeight - 36,
+        4,
+      )
       .stroke();
 
+    // =====================================================
     // Inner border
+    // =====================================================
+
     doc
-      .lineWidth(1)
-      .strokeColor("#94a3b8")
-      .rect(40, 40, pageWidth - 80, pageHeight - 80)
+      .lineWidth(0.8)
+      .strokeColor("#d9d1bd")
+      .roundedRect(
+        32,
+        32,
+        pageWidth - 64,
+        pageHeight - 64,
+        3,
+      )
       .stroke();
 
-    // Brand
+    // =====================================================
+    // Quizzy logo / brand
+    // =====================================================
+
+    // Small graduation-cap style icon
+    doc
+      .save()
+      .fillColor(NAVY)
+      .moveTo(centerX - 35, 55)
+      .lineTo(centerX, 43)
+      .lineTo(centerX + 35, 55)
+      .lineTo(centerX, 67)
+      .closePath()
+      .fill()
+      .restore();
+
     doc
       .font("Helvetica-Bold")
-      .fontSize(18)
-      .fillColor("#0f172a")
-      .text("QUIZZY", 0, 65, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Main title
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(34)
-      .fillColor("#0f172a")
-      .text("CERTIFICATE OF ACHIEVEMENT", 0, 125, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Subtitle
-    doc
-      .font("Helvetica")
-      .fontSize(15)
-      .fillColor("#64748b")
-      .text("This certificate is proudly presented to", 0, 185, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Participant name
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(30)
-      .fillColor("#0f172a")
-      .text(username, 0, 220, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Name underline
-    doc
-      .lineWidth(1)
-      .strokeColor("#cbd5e1")
-      .moveTo(230, 265)
-      .lineTo(pageWidth - 230, 265)
-      .stroke();
-
-    // Achievement text
-    doc
-      .font("Helvetica")
-      .fontSize(14)
-      .fillColor("#475569")
-      .text("for successfully completing the quiz", 0, 290, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Quiz title
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(21)
-      .fillColor("#0f172a")
-      .text(quiz.title, 100, 320, {
-        align: "center",
-        width: pageWidth - 200,
-      });
-
-    // Score
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(25)
-      .fillColor("#0f172a")
-      .text(`${percentage}%`, 0, 370, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    doc
-      .font("Helvetica")
-      .fontSize(12)
-      .fillColor("#64748b")
-      .text(`Score: ${attempt.score} / ${maximumScore}`, 0, 405, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Date
-    doc
-      .font("Helvetica")
-      .fontSize(11)
-      .fillColor("#64748b")
-      .text(`Completed on ${submittedDate}`, 0, 445, {
-        align: "center",
-        width: pageWidth,
-      });
-
-    // Footer
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(12)
-      .fillColor("#0f172a")
-      .text("Quizzy", 0, pageHeight - 95, {
-        align: "center",
-        width: pageWidth,
-      });
+      .fontSize(24)
+      .fillColor(NAVY)
+      .text(
+        "QUIZZY",
+        0,
+        72,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
 
     doc
       .font("Helvetica")
       .fontSize(9)
-      .fillColor("#94a3b8")
-      .text("Certificate issued by Quizzy", 0, pageHeight - 75, {
-        align: "center",
-        width: pageWidth,
-      });
+      .fillColor(GOLD)
+      .text(
+        "LEARN  •  CHALLENGE  •  GROW",
+        0,
+        99,
+        {
+          align: "center",
+          width: pageWidth,
+          characterSpacing: 1.5,
+        },
+      );
+
+    // =====================================================
+    // Main title
+    // =====================================================
+
+    doc
+      .font("Times-Bold")
+      .fontSize(42)
+      .fillColor(NAVY)
+      .text(
+        "CERTIFICATE",
+        0,
+        130,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
+
+    // Gold divider
+    doc
+      .lineWidth(1.5)
+      .strokeColor(GOLD)
+      .moveTo(centerX - 180, 183)
+      .lineTo(centerX + 180, 183)
+      .stroke();
+
+    doc
+      .font("Times-Roman")
+      .fontSize(19)
+      .fillColor(GOLD)
+      .text(
+        "OF ACHIEVEMENT",
+        0,
+        191,
+        {
+          align: "center",
+          width: pageWidth,
+          characterSpacing: 2,
+        },
+      );
+
+    // =====================================================
+    // Presented to
+    // =====================================================
+
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .fillColor(NAVY)
+      .text(
+        "THIS CERTIFICATE IS PROUDLY PRESENTED TO",
+        0,
+        230,
+        {
+          align: "center",
+          width: pageWidth,
+          characterSpacing: 1.2,
+        },
+      );
+
+    // =====================================================
+    // Participant name
+    // =====================================================
+
+    doc
+      .font("Times-Italic")
+      .fontSize(
+        username.length > 25
+          ? 30
+          : 36,
+      )
+      .fillColor(NAVY)
+      .text(
+        username,
+        120,
+        258,
+        {
+          align: "center",
+          width: pageWidth - 240,
+        },
+      );
+
+    // Name underline
+    doc
+      .lineWidth(0.8)
+      .strokeColor(GOLD)
+      .moveTo(220, 302)
+      .lineTo(pageWidth - 220, 302)
+      .stroke();
+
+    // =====================================================
+    // Achievement description
+    // =====================================================
+
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .fillColor(TEXT)
+      .text(
+        "for successfully completing the quiz",
+        0,
+        318,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
+
+    // =====================================================
+    // Quiz title
+    // =====================================================
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(
+        quiz.title.length > 55
+          ? 15
+          : 18,
+      )
+      .fillColor(NAVY)
+      .text(
+        quiz.title,
+        120,
+        342,
+        {
+          align: "center",
+          width: pageWidth - 240,
+        },
+      );
+
+    // =====================================================
+    // Score box
+    // =====================================================
+
+    const scoreBoxWidth = 210;
+    const scoreBoxHeight = 75;
+
+    const scoreBoxX =
+      centerX - scoreBoxWidth / 2;
+
+    const scoreBoxY = 375;
+
+    doc
+      .lineWidth(1.5)
+      .strokeColor(GOLD)
+      .roundedRect(
+        scoreBoxX,
+        scoreBoxY,
+        scoreBoxWidth,
+        scoreBoxHeight,
+        10,
+      )
+      .stroke();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(24)
+      .fillColor(NAVY)
+      .text(
+        `${score} / ${maximumScore}`,
+        scoreBoxX,
+        scoreBoxY + 13,
+        {
+          align: "center",
+          width: scoreBoxWidth,
+        },
+      );
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(14)
+      .fillColor(GOLD)
+      .text(
+        `${percentage}%`,
+        scoreBoxX,
+        scoreBoxY + 45,
+        {
+          align: "center",
+          width: scoreBoxWidth,
+        },
+      );
+
+    // =====================================================
+    // Achievement message
+    // =====================================================
+
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(MUTED)
+      .text(
+        "Your excellent performance reflects your dedication and knowledge.",
+        0,
+        465,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(11)
+      .fillColor(NAVY)
+      .text(
+        "Keep learning and keep growing!",
+        0,
+        483,
+        {
+          align: "center",
+          width: pageWidth,
+        },
+      );
+
+    // =====================================================
+    // Left signature
+    // =====================================================
+
+    const signatureY = 525;
+
+    doc
+      .lineWidth(0.8)
+      .strokeColor("#94a3b8")
+      .moveTo(180, signatureY + 25)
+      .lineTo(330, signatureY + 25)
+      .stroke();
+
+    doc
+      .font("Times-Italic")
+      .fontSize(19)
+      .fillColor(NAVY)
+      .text(
+        "Admin",
+        180,
+        signatureY,
+        {
+          align: "center",
+          width: 150,
+        },
+      );
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .fillColor(TEXT)
+      .text(
+        "ADMIN",
+        180,
+        signatureY + 32,
+        {
+          align: "center",
+          width: 150,
+          characterSpacing: 1,
+        },
+      );
+
+    doc
+      .font("Helvetica")
+      .fontSize(8)
+      .fillColor(MUTED)
+      .text(
+        "Quizzy",
+        180,
+        signatureY + 47,
+        {
+          align: "center",
+          width: 150,
+        },
+      );
+
+    // =====================================================
+    // Date
+    // =====================================================
+
+    doc
+      .lineWidth(0.8)
+      .strokeColor("#94a3b8")
+      .moveTo(
+        pageWidth - 330,
+        signatureY + 25,
+      )
+      .lineTo(
+        pageWidth - 180,
+        signatureY + 25,
+      )
+      .stroke();
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .fillColor(NAVY)
+      .text(
+        submittedDate,
+        pageWidth - 330,
+        signatureY,
+        {
+          align: "center",
+          width: 150,
+        },
+      );
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(9)
+      .fillColor(TEXT)
+      .text(
+        "DATE",
+        pageWidth - 330,
+        signatureY + 32,
+        {
+          align: "center",
+          width: 150,
+          characterSpacing: 1,
+        },
+      );
+
+    // =====================================================
+    // Achievement seal
+    // =====================================================
+
+    const sealX = centerX;
+    const sealY = 545;
+    const sealRadius = 28;
+
+    // Outer seal
+    doc
+      .lineWidth(3)
+      .strokeColor(GOLD)
+      .circle(
+        sealX,
+        sealY,
+        sealRadius,
+      )
+      .stroke();
+
+    // Inner seal
+    doc
+      .lineWidth(1)
+      .strokeColor(LIGHT_GOLD)
+      .circle(
+        sealX,
+        sealY,
+        sealRadius - 6,
+      )
+      .stroke();
+
+    // Star
+    const starPoints = [];
+
+    for (let i = 0; i < 10; i++) {
+      const angle =
+        -Math.PI / 2 +
+        (i * Math.PI) / 5;
+
+      const radius =
+        i % 2 === 0 ? 12 : 5;
+
+      starPoints.push([
+        sealX +
+          Math.cos(angle) * radius,
+        sealY +
+          Math.sin(angle) * radius,
+      ]);
+    }
+
+    doc
+      .save()
+      .fillColor(GOLD)
+      .moveTo(
+        starPoints[0][0],
+        starPoints[0][1],
+      );
+
+    for (let i = 1; i < starPoints.length; i++) {
+      doc.lineTo(
+        starPoints[i][0],
+        starPoints[i][1],
+      );
+    }
+
+    doc
+      .closePath()
+      .fill()
+      .restore();
+
+    // =====================================================
+    // Footer
+    // =====================================================
+
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(8)
+      .fillColor(MUTED)
+      .text(
+        "QUIZZY • CERTIFICATE OF ACHIEVEMENT",
+        0,
+        pageHeight - 42,
+        {
+          align: "center",
+          width: pageWidth,
+          characterSpacing: 1,
+        },
+      );
+
+    // =====================================================
+    // Finish PDF
+    // =====================================================
+
+    const safeUsername =
+      username.replace(
+        /[^a-zA-Z0-9-_]/g,
+        "_",
+      );
+
+    const filename =
+      `Quizzy-Certificate-${safeUsername}.pdf`;
+
+    res.setHeader(
+      "Content-Type",
+      "application/pdf",
+    );
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"`,
+    );
+
+    doc.pipe(res);
 
     doc.end();
   } catch (error) {
-    console.error("Download certificate error:", error);
+    console.error(
+      "Download certificate error:",
+      error,
+    );
 
     if (!res.headersSent) {
       res.status(500).json({
-        message: "Unable to generate certificate.",
+        message:
+          "Unable to generate certificate.",
       });
     }
   }
