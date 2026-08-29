@@ -82,9 +82,23 @@ const attemptSchema = new mongoose.Schema(
     }
 );
 
+// Prevent multiple attempts by the same user
+// for the same quiz.
 attemptSchema.index(
     { quiz: 1, user: 1 },
     { unique: true }
 );
+
+// Optimizes quiz attempt/leaderboard/analytics queries.
+attemptSchema.index({
+    quiz: 1,
+    status: 1,
+});
+
+// Optimizes user's completed-results queries.
+attemptSchema.index({
+    user: 1,
+    status: 1,
+});
 
 module.exports = mongoose.model("Attempt", attemptSchema);

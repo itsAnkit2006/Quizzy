@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -23,6 +23,7 @@ function AdminDashboard() {
     try {
       const response = await api.get("/quizzes/my");
 
+      console.log("QUIZ DATA:", response.data.quizzes);
       setQuizzes(response.data.quizzes);
     } catch (error) {
       if (error.response?.status === 403) {
@@ -39,6 +40,22 @@ function AdminDashboard() {
       setLoading(false);
     }
   }, [navigate]);
+
+  const stats = useMemo(() => {
+    return {
+      totalQuizzes: quizzes.length,
+
+      totalParticipants: quizzes.reduce(
+        (total, quiz) => total + (quiz.participantCount || 0),
+        0,
+      ),
+
+      totalAttempts: quizzes.reduce(
+        (total, quiz) => total + (quiz.attemptCount || 0),
+        0,
+      ),
+    };
+  }, [quizzes]);
 
   useEffect(() => {
     fetchQuizzes();
@@ -73,6 +90,7 @@ function AdminDashboard() {
       return;
     }
 
+    setError("");
     setDeleting(true);
 
     try {
@@ -83,24 +101,15 @@ function AdminDashboard() {
       setDeleteQuiz(null);
       setOpenMenu(null);
     } catch (error) {
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login");
-        return;
-      }
-
-      setError(error.response?.data?.message || "Unable to delete quiz.");
+      setError(
+        error.userMessage ||
+          error.response?.data?.message ||
+          "Unable to delete quiz.",
+      );
     } finally {
       setDeleting(false);
     }
   };
-
-  const totalQuestions = quizzes.reduce(
-    (total, quiz) => total + (quiz.questionCount || 0),
-    0,
-  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -159,7 +168,7 @@ function AdminDashboard() {
             </p>
 
             <p className="mt-2 text-3xl font-bold text-slate-900">
-              {quizzes.length}
+              {stats.totalQuizzes}
             </p>
           </div>
 
@@ -170,10 +179,7 @@ function AdminDashboard() {
             </p>
 
             <p className="mt-2 text-3xl font-bold text-slate-900">
-              {quizzes.reduce(
-                (total, quiz) => total + (quiz.participantCount || 0),
-                0,
-              )}
+              {stats.totalParticipants}
             </p>
           </div>
 
@@ -184,10 +190,7 @@ function AdminDashboard() {
             </p>
 
             <p className="mt-2 text-3xl font-bold text-slate-900">
-              {quizzes.reduce(
-                (total, quiz) => total + (quiz.attemptCount || 0),
-                0,
-              )}
+              {stats.totalAttempts}
             </p>
           </div>
         </div>

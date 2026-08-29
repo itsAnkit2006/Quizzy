@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
@@ -47,12 +47,19 @@ function QuizResult() {
     return `${minutes}m ${String(remainingSeconds).padStart(2, "0")}s`;
   };
 
-  const filteredAnswers = activeFilter
-    ? activeFilter === "all"
-      ? result?.answers || []
-      : result?.answers?.filter((answer) => answer.result === activeFilter) ||
-        []
-    : [];
+  const filteredAnswers = useMemo(() => {
+    if (!activeFilter) {
+      return [];
+    }
+
+    if (activeFilter === "all") {
+      return result?.answers || [];
+    }
+
+    return (
+      result?.answers?.filter((answer) => answer.result === activeFilter) || []
+    );
+  }, [activeFilter, result]);
 
   if (loading) {
     return (

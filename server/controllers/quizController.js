@@ -448,102 +448,88 @@ const submitQuiz = async (req, res) => {
 };
 
 const getAttemptResult = async (req, res) => {
-    try {
-        const { shareCode, attemptId } = req.params;
+  try {
+    const { shareCode, attemptId } = req.params;
 
-        const quiz = await Quiz.findOne({
-            shareCode: shareCode.toUpperCase(),
-        }).lean();
+    const quiz = await Quiz.findOne({
+      shareCode: shareCode.toUpperCase(),
+    }).lean();
 
-        if (!quiz) {
-            return res.status(404).json({
-                message: "Quiz not found.",
-            });
-        }
-
-        const attempt = await Attempt.findOne({
-            _id: attemptId,
-            quiz: quiz._id,
-            user: req.user._id,
-            status: "completed",
-        }).lean();
-
-        if (!attempt) {
-            return res.status(404).json({
-                message: "Result not found.",
-            });
-        }
-
-        const answers = quiz.questions.map(
-            (question, index) => {
-                const submitted = attempt.answers.find(
-                    (answer) =>
-                        String(answer.questionId) ===
-                        String(question._id)
-                );
-
-                const selectedAnswer =
-                    submitted?.selectedAnswer ?? null;
-
-                let result = "unanswered";
-
-                if (selectedAnswer !== null) {
-                    result =
-                        selectedAnswer ===
-                        question.correctAnswer
-                            ? "correct"
-                            : "wrong";
-                }
-
-                return {
-                    number: index + 1,
-
-                    question: question.question,
-
-                    options: question.options,
-
-                    selectedAnswer,
-
-                    correctAnswer:
-                        question.correctAnswer,
-
-                    result,
-                };
-            }
-        );
-
-        res.json({
-            result: {
-                attemptId: attempt._id,
-                quizTitle: quiz.title,
-
-                correctAnswers:
-                    attempt.correctAnswers,
-
-                wrongAnswers:
-                    attempt.wrongAnswers,
-
-                unanswered:
-                    attempt.unanswered,
-
-                score: attempt.score,
-
-                timeTaken:
-                    attempt.timeTaken,
-
-                submittedAt:
-                    attempt.submittedAt,
-
-                answers,
-            },
-        });
-    } catch (error) {
-        console.error("Get result error:", error);
-
-        res.status(500).json({
-            message: "Unable to load result.",
-        });
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found.",
+      });
     }
+
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      quiz: quiz._id,
+      user: req.user._id,
+      status: "completed",
+    }).lean();
+
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Result not found.",
+      });
+    }
+
+    const answers = quiz.questions.map((question, index) => {
+      const submitted = attempt.answers.find(
+        (answer) => String(answer.questionId) === String(question._id),
+      );
+
+      const selectedAnswer = submitted?.selectedAnswer ?? null;
+
+      let result = "unanswered";
+
+      if (selectedAnswer !== null) {
+        result =
+          selectedAnswer === question.correctAnswer ? "correct" : "wrong";
+      }
+
+      return {
+        number: index + 1,
+
+        question: question.question,
+
+        options: question.options,
+
+        selectedAnswer,
+
+        correctAnswer: question.correctAnswer,
+
+        result,
+      };
+    });
+
+    res.json({
+      result: {
+        attemptId: attempt._id,
+        quizTitle: quiz.title,
+
+        correctAnswers: attempt.correctAnswers,
+
+        wrongAnswers: attempt.wrongAnswers,
+
+        unanswered: attempt.unanswered,
+
+        score: attempt.score,
+
+        timeTaken: attempt.timeTaken,
+
+        submittedAt: attempt.submittedAt,
+
+        answers,
+      },
+    });
+  } catch (error) {
+    console.error("Get result error:", error);
+
+    res.status(500).json({
+      message: "Unable to load result.",
+    });
+  }
 };
 
 const getMyResults = async (req, res) => {
@@ -781,31 +767,39 @@ const getQuizAnalytics = async (req, res) => {
       quiz: quiz._id,
       status: "completed",
     })
+      .select(
+        "user answers score correctAnswers wrongAnswers unanswered timeTaken submittedAt",
+      )
       .populate("user", "username")
       .lean();
 
-    const participantCount = attempts.length;
+    // Count unique participants, not total attempts.
+    const participantIds = new Set(
+      attempts.map((attempt) => String(attempt.user?._id || attempt.user)),
+    );
+
+    const participantCount = participantIds.size;
 
     let averageScore = 0;
     let highestScore = 0;
     let averageTime = 0;
 
     if (attempts.length > 0) {
-      const totalScore = attempts.reduce(
-        (sum, attempt) => sum + Number(attempt.score || 0),
-        0,
-      );
+      let totalScore = 0;
+      let totalTime = 0;
 
-      const totalTime = attempts.reduce(
-        (sum, attempt) => sum + Number(attempt.timeTaken || 0),
-        0,
-      );
+      for (const attempt of attempts) {
+        totalScore += Number(attempt.score || 0);
+        totalTime += Number(attempt.timeTaken || 0);
+
+        const score = Number(attempt.score || 0);
+
+        if (score > highestScore) {
+          highestScore = score;
+        }
+      }
 
       averageScore = Number((totalScore / attempts.length).toFixed(2));
-
-      highestScore = Math.max(
-        ...attempts.map((attempt) => Number(attempt.score || 0)),
-      );
 
       averageTime = Math.round(totalTime / attempts.length);
     }
@@ -813,12 +807,17 @@ const getQuizAnalytics = async (req, res) => {
     // Sort leaderboard
     const leaderboard = [...attempts]
       .sort((a, b) => {
-        if (b.score !== a.score) {
-          return b.score - a.score;
+        const scoreDifference = Number(b.score || 0) - Number(a.score || 0);
+
+        if (scoreDifference !== 0) {
+          return scoreDifference;
         }
 
-        if (a.timeTaken !== b.timeTaken) {
-          return a.timeTaken - b.timeTaken;
+        const timeDifference =
+          Number(a.timeTaken || 0) - Number(b.timeTaken || 0);
+
+        if (timeDifference !== 0) {
+          return timeDifference;
         }
 
         return new Date(a.submittedAt) - new Date(b.submittedAt);
@@ -834,24 +833,26 @@ const getQuizAnalytics = async (req, res) => {
         timeTaken: attempt.timeTaken,
       }));
 
-    // Question analytics
+    // Build question analytics using Maps for
+    // faster answer lookups.
     const questionAnalytics = quiz.questions.map((question, questionIndex) => {
       let correct = 0;
       let wrong = 0;
       let unanswered = 0;
 
       for (const attempt of attempts) {
-        const answer = attempt.answers.find(
-          (item) => String(item.questionId) === String(question._id),
+        const answerMap = new Map(
+          (attempt.answers || []).map((answer) => [
+            String(answer.questionId),
+            answer.selectedAnswer,
+          ]),
         );
 
-        if (
-          !answer ||
-          answer.selectedAnswer === null ||
-          answer.selectedAnswer === undefined
-        ) {
+        const selectedAnswer = answerMap.get(String(question._id));
+
+        if (selectedAnswer === undefined || selectedAnswer === null) {
           unanswered++;
-        } else if (answer.selectedAnswer === question.correctAnswer) {
+        } else if (selectedAnswer === question.correctAnswer) {
           correct++;
         } else {
           wrong++;

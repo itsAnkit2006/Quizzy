@@ -91,4 +91,9 @@ const quizSchema = new mongoose.Schema(
     }
 );
 
+// Optimizes the admin's "my quizzes" query.
+quizSchema.index({
+    createdBy: 1,
+});
+
 module.exports = mongoose.model("Quiz", quizSchema);
