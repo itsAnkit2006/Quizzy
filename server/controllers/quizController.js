@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const PDFDocument = require("pdfkit");
 
 const Quiz = require("../models/Quiz");
 const Attempt = require("../models/Attempt");
@@ -669,41 +670,27 @@ const updateQuiz = async (req, res) => {
       questions.length === 0
     ) {
       return res.status(400).json({
-        message:
-          "Title, duration and questions are required.",
+        message: "Title, duration and questions are required.",
       });
     }
 
     const numericDuration = Number(duration);
-    const numericPositiveMarks = Number(
-      positiveMarks ?? 1,
-    );
-    const numericNegativeMarks = Number(
-      negativeMarks ?? 0,
-    );
+    const numericPositiveMarks = Number(positiveMarks ?? 1);
+    const numericNegativeMarks = Number(negativeMarks ?? 0);
 
-    if (
-      !Number.isFinite(numericDuration) ||
-      numericDuration < 1
-    ) {
+    if (!Number.isFinite(numericDuration) || numericDuration < 1) {
       return res.status(400).json({
         message: "Duration must be at least 1 minute.",
       });
     }
 
-    if (
-      !Number.isFinite(numericPositiveMarks) ||
-      numericPositiveMarks < 0
-    ) {
+    if (!Number.isFinite(numericPositiveMarks) || numericPositiveMarks < 0) {
       return res.status(400).json({
         message: "Positive marks cannot be negative.",
       });
     }
 
-    if (
-      !Number.isFinite(numericNegativeMarks) ||
-      numericNegativeMarks < 0
-    ) {
+    if (!Number.isFinite(numericNegativeMarks) || numericNegativeMarks < 0) {
       return res.status(400).json({
         message: "Negative marks cannot be negative.",
       });
@@ -725,9 +712,7 @@ const updateQuiz = async (req, res) => {
 
       if (
         question.options.some(
-          (option) =>
-            typeof option !== "string" ||
-            !option.trim(),
+          (option) => typeof option !== "string" || !option.trim(),
         )
       ) {
         return res.status(400).json({
@@ -821,116 +806,217 @@ const getQuizAnalytics = async (req, res) => {
       });
     }
 
+    // Get completed attempts
     const attempts = await Attempt.find({
       quiz: quiz._id,
       status: "completed",
     })
-      .select(
-        "user answers score correctAnswers wrongAnswers unanswered timeTaken submittedAt",
-      )
       .populate("user", "username")
       .lean();
 
-    // Count unique participants, not total attempts.
-    const participantIds = new Set(
-      attempts.map((attempt) => String(attempt.user?._id || attempt.user)),
-    );
+    const participantCount = attempts.length;
 
-    const participantCount = participantIds.size;
+    // =====================================================
+    // Basic statistics
+    // =====================================================
 
     let averageScore = 0;
     let highestScore = 0;
     let averageTime = 0;
 
     if (attempts.length > 0) {
-      let totalScore = 0;
-      let totalTime = 0;
+      const totalScore = attempts.reduce(
+        (sum, attempt) =>
+          sum + Number(attempt.score || 0),
+        0,
+      );
 
-      for (const attempt of attempts) {
-        totalScore += Number(attempt.score || 0);
-        totalTime += Number(attempt.timeTaken || 0);
+      const totalTime = attempts.reduce(
+        (sum, attempt) =>
+          sum + Number(attempt.timeTaken || 0),
+        0,
+      );
 
-        const score = Number(attempt.score || 0);
+      averageScore = Number(
+        (totalScore / attempts.length).toFixed(2),
+      );
 
-        if (score > highestScore) {
-          highestScore = score;
-        }
-      }
+      highestScore = Math.max(
+        ...attempts.map((attempt) =>
+          Number(attempt.score || 0),
+        ),
+      );
 
-      averageScore = Number((totalScore / attempts.length).toFixed(2));
-
-      averageTime = Math.round(totalTime / attempts.length);
+      averageTime = Math.round(
+        totalTime / attempts.length,
+      );
     }
 
-    // Sort leaderboard
+    // =====================================================
+    // Quiz scoring information
+    // =====================================================
+
+    const questionCount =
+      Number(quiz.questionCount) ||
+      quiz.questions.length;
+
+    const positiveMarks =
+      Number(quiz.positiveMarks) || 0;
+
+    const negativeMarks =
+      Number(quiz.negativeMarks) || 0;
+
+    const maximumScore =
+      questionCount * positiveMarks;
+
+    // =====================================================
+    // Leaderboard
+    // =====================================================
+
     const leaderboard = [...attempts]
       .sort((a, b) => {
-        const scoreDifference = Number(b.score || 0) - Number(a.score || 0);
+        const scoreA = Number(a.score || 0);
+        const scoreB = Number(b.score || 0);
 
-        if (scoreDifference !== 0) {
-          return scoreDifference;
+        // Higher score first
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
         }
 
-        const timeDifference =
-          Number(a.timeTaken || 0) - Number(b.timeTaken || 0);
+        const timeA = Number(a.timeTaken || 0);
+        const timeB = Number(b.timeTaken || 0);
 
-        if (timeDifference !== 0) {
-          return timeDifference;
+        // Faster completion first
+        if (timeA !== timeB) {
+          return timeA - timeB;
         }
 
-        return new Date(a.submittedAt) - new Date(b.submittedAt);
-      })
-      .map((attempt, index) => ({
-        rank: index + 1,
-        attemptId: attempt._id,
-        username: attempt.user?.username || "Unknown User",
-        score: attempt.score,
-        correctAnswers: attempt.correctAnswers,
-        wrongAnswers: attempt.wrongAnswers,
-        unanswered: attempt.unanswered,
-        timeTaken: attempt.timeTaken,
-      }));
-
-    // Build question analytics using Maps for
-    // faster answer lookups.
-    const questionAnalytics = quiz.questions.map((question, questionIndex) => {
-      let correct = 0;
-      let wrong = 0;
-      let unanswered = 0;
-
-      for (const attempt of attempts) {
-        const answerMap = new Map(
-          (attempt.answers || []).map((answer) => [
-            String(answer.questionId),
-            answer.selectedAnswer,
-          ]),
+        // Earlier submission first
+        return (
+          new Date(a.submittedAt) -
+          new Date(b.submittedAt)
         );
+      })
+      .map((attempt, index) => {
+        const score = Number(attempt.score || 0);
 
-        const selectedAnswer = answerMap.get(String(question._id));
+        let percentage = 0;
 
-        if (selectedAnswer === undefined || selectedAnswer === null) {
-          unanswered++;
-        } else if (selectedAnswer === question.correctAnswer) {
-          correct++;
-        } else {
-          wrong++;
+        if (maximumScore > 0) {
+          percentage = Number(
+            Math.min(
+              100,
+              Math.max(
+                0,
+                (score / maximumScore) * 100,
+              ),
+            ).toFixed(1),
+          );
         }
-      }
 
-      const total = correct + wrong + unanswered;
+        return {
+          rank: index + 1,
 
-      const correctPercentage =
-        total > 0 ? Number(((correct / total) * 100).toFixed(1)) : 0;
+          attemptId: attempt._id,
 
-      return {
-        number: questionIndex + 1,
-        question: question.question,
-        correct,
-        wrong,
-        unanswered,
-        correctPercentage,
-      };
-    });
+          username:
+            attempt.user?.username ||
+            "Unknown User",
+
+          score,
+
+          percentage,
+
+          // 60% or higher = certificate eligible
+          certificateEligible:
+            percentage >= 60,
+
+          correctAnswers:
+            Number(
+              attempt.correctAnswers || 0,
+            ),
+
+          wrongAnswers:
+            Number(
+              attempt.wrongAnswers || 0,
+            ),
+
+          unanswered:
+            Number(
+              attempt.unanswered || 0,
+            ),
+
+          timeTaken:
+            Number(
+              attempt.timeTaken || 0,
+            ),
+        };
+      });
+
+    // =====================================================
+    // Question analytics
+    // =====================================================
+
+    const questionAnalytics =
+      quiz.questions.map(
+        (question, questionIndex) => {
+          let correct = 0;
+          let wrong = 0;
+          let unanswered = 0;
+
+          for (const attempt of attempts) {
+            const answer =
+              attempt.answers.find(
+                (item) =>
+                  String(item.questionId) ===
+                  String(question._id),
+              );
+
+            if (
+              !answer ||
+              answer.selectedAnswer === null ||
+              answer.selectedAnswer === undefined
+            ) {
+              unanswered++;
+            } else if (
+              answer.selectedAnswer ===
+              question.correctAnswer
+            ) {
+              correct++;
+            } else {
+              wrong++;
+            }
+          }
+
+          const total =
+            correct +
+            wrong +
+            unanswered;
+
+          const correctPercentage =
+            total > 0
+              ? Number(
+                  (
+                    (correct / total) *
+                    100
+                  ).toFixed(1),
+                )
+              : 0;
+
+          return {
+            number: questionIndex + 1,
+            question: question.question,
+            correct,
+            wrong,
+            unanswered,
+            correctPercentage,
+          };
+        },
+      );
+
+    // =====================================================
+    // Response
+    // =====================================================
 
     res.json({
       quiz: {
@@ -938,7 +1024,15 @@ const getQuizAnalytics = async (req, res) => {
         title: quiz.title,
         description: quiz.description,
         duration: quiz.duration,
-        questionCount: quiz.questions.length,
+
+        questionCount,
+
+        positiveMarks,
+
+        negativeMarks,
+
+        maximumScore,
+
         shareCode: quiz.shareCode,
       },
 
@@ -954,10 +1048,14 @@ const getQuizAnalytics = async (req, res) => {
       questionAnalytics,
     });
   } catch (error) {
-    console.error("Quiz analytics error:", error);
+    console.error(
+      "Quiz analytics error:",
+      error,
+    );
 
     res.status(500).json({
-      message: "Unable to load quiz analytics.",
+      message:
+        "Unable to load quiz analytics.",
     });
   }
 };
@@ -1040,6 +1138,241 @@ const getParticipantAttempt = async (req, res) => {
   }
 };
 
+const downloadCertificate = async (req, res) => {
+  try {
+    const { quizId, attemptId } = req.params;
+
+    // Make sure the quiz belongs to the logged-in admin
+    const quiz = await Quiz.findOne({
+      _id: quizId,
+      createdBy: req.user._id,
+    }).lean();
+
+    if (!quiz) {
+      return res.status(404).json({
+        message: "Quiz not found.",
+      });
+    }
+
+    // Find the completed participant attempt
+    const attempt = await Attempt.findOne({
+      _id: attemptId,
+      quiz: quiz._id,
+      status: "completed",
+    })
+      .populate("user", "username")
+      .lean();
+
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Participant attempt not found.",
+      });
+    }
+
+    // Calculate maximum possible score
+    const maximumScore = quiz.questionCount * Number(quiz.positiveMarks || 0);
+
+    if (maximumScore <= 0) {
+      return res.status(400).json({
+        message: "Certificate cannot be generated for this quiz.",
+      });
+    }
+
+    // Calculate percentage
+    const percentage = Number(
+      Math.min(
+        100,
+        Math.max(0, (Number(attempt.score || 0) / maximumScore) * 100),
+      ).toFixed(1),
+    );
+
+    // Certificate eligibility
+    if (percentage < 60) {
+      return res.status(403).json({
+        message:
+          "Certificate is available only for participants scoring 60% or above.",
+      });
+    }
+
+    const username = attempt.user?.username || "Participant";
+
+    const submittedDate = attempt.submittedAt
+      ? new Date(attempt.submittedAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : new Date().toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+
+    // Create PDF
+    const doc = new PDFDocument({
+      size: "A4",
+      layout: "landscape",
+      margin: 0,
+    });
+
+    const safeUsername = username.replace(/[^a-zA-Z0-9-_]/g, "_");
+
+    const filename = `Quizzy-Certificate-${safeUsername}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    doc.pipe(res);
+
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+
+    // Background
+    doc.rect(0, 0, pageWidth, pageHeight).fill("#f8fafc");
+
+    // Outer border
+    doc
+      .lineWidth(3)
+      .strokeColor("#0f172a")
+      .rect(25, 25, pageWidth - 50, pageHeight - 50)
+      .stroke();
+
+    // Inner border
+    doc
+      .lineWidth(1)
+      .strokeColor("#94a3b8")
+      .rect(40, 40, pageWidth - 80, pageHeight - 80)
+      .stroke();
+
+    // Brand
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(18)
+      .fillColor("#0f172a")
+      .text("QUIZZY", 0, 65, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Main title
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(34)
+      .fillColor("#0f172a")
+      .text("CERTIFICATE OF ACHIEVEMENT", 0, 125, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Subtitle
+    doc
+      .font("Helvetica")
+      .fontSize(15)
+      .fillColor("#64748b")
+      .text("This certificate is proudly presented to", 0, 185, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Participant name
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(30)
+      .fillColor("#0f172a")
+      .text(username, 0, 220, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Name underline
+    doc
+      .lineWidth(1)
+      .strokeColor("#cbd5e1")
+      .moveTo(230, 265)
+      .lineTo(pageWidth - 230, 265)
+      .stroke();
+
+    // Achievement text
+    doc
+      .font("Helvetica")
+      .fontSize(14)
+      .fillColor("#475569")
+      .text("for successfully completing the quiz", 0, 290, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Quiz title
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(21)
+      .fillColor("#0f172a")
+      .text(quiz.title, 100, 320, {
+        align: "center",
+        width: pageWidth - 200,
+      });
+
+    // Score
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(25)
+      .fillColor("#0f172a")
+      .text(`${percentage}%`, 0, 370, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    doc
+      .font("Helvetica")
+      .fontSize(12)
+      .fillColor("#64748b")
+      .text(`Score: ${attempt.score} / ${maximumScore}`, 0, 405, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Date
+    doc
+      .font("Helvetica")
+      .fontSize(11)
+      .fillColor("#64748b")
+      .text(`Completed on ${submittedDate}`, 0, 445, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    // Footer
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor("#0f172a")
+      .text("Quizzy", 0, pageHeight - 95, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    doc
+      .font("Helvetica")
+      .fontSize(9)
+      .fillColor("#94a3b8")
+      .text("Certificate issued by Quizzy", 0, pageHeight - 75, {
+        align: "center",
+        width: pageWidth,
+      });
+
+    doc.end();
+  } catch (error) {
+    console.error("Download certificate error:", error);
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        message: "Unable to generate certificate.",
+      });
+    }
+  }
+};
+
 const deleteQuiz = async (req, res) => {
   try {
     const { quizId } = req.params;
@@ -1091,5 +1424,6 @@ module.exports = {
   getAdminQuiz,
   getQuizAnalytics,
   getParticipantAttempt,
+  downloadCertificate,
   deleteQuiz,
 };

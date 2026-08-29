@@ -9,13 +9,16 @@ function QuizAnalytics() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [certificateLoading, setCertificateLoading] = useState(null);
 
   const fetchAnalytics = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await api.get(`/quizzes/admin/${quizId}/analytics`);
+      const response = await api.get(
+        `/quizzes/admin/${quizId}/analytics`,
+      );
 
       setData(response.data);
     } catch (error) {
@@ -74,19 +77,88 @@ function QuizAnalytics() {
     };
   };
 
+  // =========================================================
+  // Download Certificate
+  // =========================================================
+
+  const handleDownloadCertificate = async (entry) => {
+    if (!entry.certificateEligible) {
+      return;
+    }
+
+    setCertificateLoading(entry.attemptId);
+    setError("");
+
+    try {
+      const response = await api.get(
+        `/quizzes/admin/${quizId}/attempt/${entry.attemptId}/certificate`,
+        {
+          responseType: "blob",
+        },
+      );
+
+      const blob = new Blob(
+        [response.data],
+        {
+          type: "application/pdf",
+        },
+      );
+
+      const url = window.URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = `Quizzy-Certificate-${entry.username
+        .replace(/[^a-zA-Z0-9-_]/g, "_")}.pdf`;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      // Axios returns the backend JSON error as a Blob
+      // when responseType is "blob".
+      let message =
+        error.userMessage ||
+        "Unable to download certificate.";
+
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+
+          message =
+            parsed.message || message;
+        } catch {
+          // Keep the default message.
+        }
+      }
+
+      setError(message);
+    } finally {
+      setCertificateLoading(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5">
         <div className="text-center">
           <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
-          <p className="mt-3 text-sm text-slate-500">Loading analytics...</p>
+          <p className="mt-3 text-sm text-slate-500">
+            Loading analytics...
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (error && !data) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5">
         <div className="w-full max-w-md text-center">
@@ -124,7 +196,12 @@ function QuizAnalytics() {
     );
   }
 
-  const { quiz, statistics, leaderboard = [], questionAnalytics = [] } = data;
+  const {
+    quiz,
+    statistics,
+    leaderboard = [],
+    questionAnalytics = [],
+  } = data;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -150,7 +227,9 @@ function QuizAnalytics() {
       <main className="mx-auto max-w-5xl px-5 py-8 pb-12 sm:py-10">
         {/* Header */}
         <header>
-          <p className="text-sm font-semibold text-slate-500">Quiz Analytics</p>
+          <p className="text-sm font-semibold text-slate-500">
+            Quiz Analytics
+          </p>
 
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {quiz.title}
@@ -162,6 +241,23 @@ function QuizAnalytics() {
             {quiz.duration} minutes
           </p>
         </header>
+
+        {/* Certificate error */}
+        {error && data && (
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-medium text-red-700">
+              {error}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => setError("")}
+              className="mt-2 text-xs font-semibold text-red-600 hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Statistics */}
         <section className="mt-8">
@@ -176,7 +272,9 @@ function QuizAnalytics() {
                 {statistics.participantCount}
               </p>
 
-              <p className="mt-1 text-xs text-slate-500">Completed</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Completed
+              </p>
             </div>
 
             {/* Average score */}
@@ -204,7 +302,9 @@ function QuizAnalytics() {
                 {statistics.highestScore}
               </p>
 
-              <p className="mt-1 text-xs text-slate-500">Best performance</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Best performance
+              </p>
             </div>
 
             {/* Average time */}
@@ -217,7 +317,9 @@ function QuizAnalytics() {
                 {formatTime(statistics.averageTime)}
               </p>
 
-              <p className="mt-1 text-xs text-slate-500">Time per attempt</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Time per attempt
+              </p>
             </div>
           </div>
         </section>
@@ -247,7 +349,9 @@ function QuizAnalytics() {
                   }
                   className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:bg-slate-50 sm:p-5"
                 >
-                  <div className="text-2xl sm:text-3xl">🥈</div>
+                  <div className="text-2xl sm:text-3xl">
+                    🥈
+                  </div>
 
                   <p className="mt-2 truncate text-sm font-bold text-slate-900">
                     {leaderboard[1].username}
@@ -275,7 +379,9 @@ function QuizAnalytics() {
                 }
                 className="rounded-2xl border-2 border-slate-900 bg-slate-900 p-4 text-center text-white shadow-lg sm:p-6"
               >
-                <div className="text-3xl sm:text-4xl">🥇</div>
+                <div className="text-3xl sm:text-4xl">
+                  🥇
+                </div>
 
                 <p className="mt-2 truncate text-sm font-bold">
                   {leaderboard[0].username}
@@ -301,7 +407,9 @@ function QuizAnalytics() {
                   }
                   className="rounded-2xl border border-slate-200 bg-white p-3 text-center shadow-sm transition hover:bg-slate-50 sm:p-5"
                 >
-                  <div className="text-2xl sm:text-3xl">🥉</div>
+                  <div className="text-2xl sm:text-3xl">
+                    🥉
+                  </div>
 
                   <p className="mt-2 truncate text-sm font-bold text-slate-900">
                     {leaderboard[2].username}
@@ -325,7 +433,9 @@ function QuizAnalytics() {
         {/* Participants */}
         <section className="mt-10">
           <div>
-            <h2 className="text-xl font-bold text-slate-900">Participants</h2>
+            <h2 className="text-xl font-bold text-slate-900">
+              Participants
+            </h2>
 
             <p className="mt-1 text-sm text-slate-500">
               Click a participant to view their complete attempt.
@@ -350,47 +460,95 @@ function QuizAnalytics() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {leaderboard.map((entry) => (
-                  <button
-                    key={`${entry.rank}-${entry.username}`}
-                    type="button"
-                    onClick={() =>
-                      navigate(
-                        `/admin/quiz/${quiz.id}/attempt/${entry.attemptId}`,
-                      )
-                    }
-                    className="flex w-full items-center gap-3 p-4 text-left transition hover:bg-slate-50 active:bg-slate-100"
+                  <div
+                    key={`${entry.rank}-${entry.attemptId}`}
+                    className="flex w-full items-center gap-3 p-4 transition hover:bg-slate-50"
                   >
                     {/* Rank */}
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/admin/quiz/${quiz.id}/attempt/${entry.attemptId}`,
+                        )
+                      }
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-700"
+                    >
                       {getRankDisplay(entry.rank)}
-                    </div>
+                    </button>
 
                     {/* User */}
-                    <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/admin/quiz/${quiz.id}/attempt/${entry.attemptId}`,
+                        )
+                      }
+                      className="min-w-0 flex-1 text-left"
+                    >
                       <p className="truncate text-sm font-bold text-slate-900">
                         {entry.username}
                       </p>
 
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
-                        <span>{entry.correctAnswers} correct</span>
+                        <span>
+                          {entry.correctAnswers} correct
+                        </span>
 
-                        <span>{entry.wrongAnswers} wrong</span>
+                        <span>
+                          {entry.wrongAnswers} wrong
+                        </span>
 
-                        <span>{entry.unanswered} skipped</span>
+                        <span>
+                          {entry.unanswered} skipped
+                        </span>
                       </div>
-                    </div>
+                    </button>
 
-                    {/* Score / Time */}
-                    <div className="shrink-0 text-right">
+                    {/* Score */}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/admin/quiz/${quiz.id}/attempt/${entry.attemptId}`,
+                        )
+                      }
+                      className="shrink-0 text-right"
+                    >
                       <p className="text-lg font-bold text-slate-900">
                         {entry.score}
+                      </p>
+
+                      <p className="text-xs font-semibold text-slate-500">
+                        {entry.percentage ?? 0}%
                       </p>
 
                       <p className="mt-0.5 text-xs text-slate-400">
                         {formatTime(entry.timeTaken)}
                       </p>
-                    </div>
-                  </button>
+                    </button>
+
+                    {/* Certificate */}
+                    {entry.certificateEligible && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDownloadCertificate(entry)
+                        }
+                        disabled={
+                          certificateLoading ===
+                          entry.attemptId
+                        }
+                        className="shrink-0 rounded-xl bg-slate-900 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
+                      >
+                        {certificateLoading ===
+                        entry.attemptId
+                          ? "Downloading..."
+                          : "Certificate"}
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -416,7 +574,9 @@ function QuizAnalytics() {
           ) : (
             <div className="mt-5 space-y-3">
               {questionAnalytics.map((question) => {
-                const difficulty = getDifficulty(question.correctPercentage);
+                const difficulty = getDifficulty(
+                  question.correctPercentage,
+                );
 
                 return (
                   <div
