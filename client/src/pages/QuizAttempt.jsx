@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../services/api";
 
@@ -27,64 +27,98 @@ function QuizAttempt() {
   const progress =
     questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
 
-  useEffect(() => {
-    const fetchQuiz = async () => {
-      try {
-        const response = await api.get(`/quizzes/${shareCode}`);
+  const fetchQuiz = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-        const quizData = response.data.quiz;
+    try {
+      const response = await api.get(`/quizzes/${shareCode}`);
 
-        const startResponse = await api.post(`/quizzes/${shareCode}/start`);
+      const quizData = response.data.quiz;
 
-        const attempt = startResponse.data.attempt;
+      const startResponse = await api.post(`/quizzes/${shareCode}/start`);
 
-        setQuiz(quizData);
+      const attempt = startResponse.data.attempt;
 
-        // Restore previously selected answers
-        const restoredAnswers = {};
+      setQuiz(quizData);
 
-        for (const answer of attempt.answers || []) {
-          if (
-            answer.selectedAnswer !== null &&
-            answer.selectedAnswer !== undefined
-          ) {
-            restoredAnswers[String(answer.questionId)] = answer.selectedAnswer;
-          }
+      const restoredAnswers = {};
+
+      for (const answer of attempt.answers || []) {
+        if (
+          answer.selectedAnswer !== null &&
+          answer.selectedAnswer !== undefined
+        ) {
+          restoredAnswers[String(answer.questionId)] = answer.selectedAnswer;
         }
-
-        setAnswers(restoredAnswers);
-
-        setTimeLeft(
-          Math.max(
-            0,
-            quizData.duration * 60 -
-              Math.floor(
-                (Date.now() - new Date(attempt.startedAt).getTime()) / 1000,
-              ),
-          ),
-        );
-      } catch (error) {
-        if (error.response?.status === 401) {
-          navigate("/login");
-          return;
-        }
-
-        if (error.response?.status === 409) {
-          setError(error.response.data.message);
-          setLoading(false);
-          return;
-        }
-
-        setError(error.response?.data?.message || "Unable to load quiz.");
-      } finally {
-        setLoading(false);
       }
-    };
 
+      setAnswers(restoredAnswers);
+
+      setTimeLeft(
+        Math.max(
+          0,
+          quizData.duration * 60 -
+            Math.floor(
+              (Date.now() - new Date(attempt.startedAt).getTime()) / 1000,
+            ),
+        ),
+      );
+    } catch (error) {
+      if (error.response?.status === 409) {
+        setError(
+          error.response?.data?.message ||
+            "This quiz attempt cannot be started.",
+        );
+        return;
+      }
+
+      setError(
+        error.userMessage ||
+          error.response?.data?.message ||
+          "Unable to load quiz.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [shareCode]);
+
+  const handleSubmit = useCallback(async () => {
+    if (submitting) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    setShowSubmitModal(false);
+
+    try {
+      const submittedAnswers = questions.map((question) => ({
+        questionId: question.id,
+        selectedAnswer: answers[question.id] ?? null,
+      }));
+
+      const response = await api.post(`/quizzes/${shareCode}/submit`, {
+        answers: submittedAnswers,
+      });
+
+      navigate(`/quiz/${shareCode}/result/${response.data.result.attemptId}`);
+    } catch (error) {
+      setError(
+        error.userMessage ||
+          error.response?.data?.message ||
+          "Unable to submit quiz.",
+      );
+
+      setSubmitting(false);
+    }
+  }, [submitting, questions, answers, shareCode, navigate]);
+
+    useEffect(() => {
     fetchQuiz();
-  }, [shareCode, navigate]);
+  }, [fetchQuiz]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (timeLeft === null || submitting || !quiz) {
       return;
     }
@@ -106,7 +140,7 @@ function QuizAttempt() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, submitting, quiz]);
+  }, [timeLeft, submitting, quiz, handleSubmit]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -162,41 +196,6 @@ function QuizAttempt() {
     });
   };
 
-  const handleSubmit = async () => {
-    if (submitting) {
-      return;
-    }
-
-    setSubmitting(true);
-    setError("");
-    setShowSubmitModal(false);
-
-    try {
-      const submittedAnswers = questions.map((question) => ({
-        questionId: question.id,
-        selectedAnswer: answers[question.id] ?? null,
-      }));
-
-      const response = await api.post(`/quizzes/${shareCode}/submit`, {
-        answers: submittedAnswers,
-      });
-
-      navigate(`/quiz/${shareCode}/result/${response.data.result.attemptId}`);
-    } catch (error) {
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login");
-        return;
-      }
-
-      setError(error.response?.data?.message || "Unable to submit quiz.");
-
-      setSubmitting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5">
@@ -223,12 +222,24 @@ function QuizAttempt() {
 
           <p className="mt-2 text-sm leading-6 text-slate-500">{error}</p>
 
-          <button
-            onClick={() => navigate(-1)}
-            className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white"
-          >
-            Go Back
-          </button>
+          <div className="mt-6 flex gap-3 justify-center">
+            <button
+              type="button"
+              onClick={fetchQuiz}
+              disabled={loading}
+              className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Retrying..." : "Try Again"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );
