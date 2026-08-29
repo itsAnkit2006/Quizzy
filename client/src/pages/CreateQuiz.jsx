@@ -19,9 +19,7 @@ function CreateQuiz() {
     negativeMarks: 0,
   });
 
-  const [questions, setQuestions] = useState([
-    createEmptyQuestion(),
-  ]);
+  const [questions, setQuestions] = useState([createEmptyQuestion()]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,20 +50,14 @@ function CreateQuiz() {
     setError("");
   };
 
-  const handleOptionChange = (
-    questionIndex,
-    optionIndex,
-    value,
-  ) => {
+  const handleOptionChange = (questionIndex, optionIndex, value) => {
     setQuestions((prev) =>
       prev.map((question, index) => {
         if (index !== questionIndex) {
           return question;
         }
 
-        const updatedOptions = [
-          ...question.options,
-        ];
+        const updatedOptions = [...question.options];
 
         updatedOptions[optionIndex] = value;
 
@@ -79,10 +71,7 @@ function CreateQuiz() {
     setError("");
   };
 
-  const handleCorrectAnswerChange = (
-    questionIndex,
-    optionIndex,
-  ) => {
+  const handleCorrectAnswerChange = (questionIndex, optionIndex) => {
     setQuestions((prev) =>
       prev.map((question, index) =>
         index === questionIndex
@@ -96,10 +85,7 @@ function CreateQuiz() {
   };
 
   const addQuestion = () => {
-    setQuestions((prev) => [
-      ...prev,
-      createEmptyQuestion(),
-    ]);
+    setQuestions((prev) => [...prev, createEmptyQuestion()]);
 
     setTimeout(() => {
       window.scrollTo({
@@ -111,17 +97,11 @@ function CreateQuiz() {
 
   const removeQuestion = (indexToRemove) => {
     if (questions.length === 1) {
-      setError(
-        "A quiz must contain at least one question.",
-      );
+      setError("A quiz must contain at least one question.");
       return;
     }
 
-    setQuestions((prev) =>
-      prev.filter(
-        (_, index) => index !== indexToRemove,
-      ),
-    );
+    setQuestions((prev) => prev.filter((_, index) => index !== indexToRemove));
 
     setError("");
   };
@@ -130,9 +110,7 @@ function CreateQuiz() {
     return questions.filter(
       (question) =>
         question.question.trim() &&
-        question.options.every(
-          (option) => option.trim(),
-        ),
+        question.options.every((option) => option.trim()),
     ).length;
   };
 
@@ -147,30 +125,22 @@ function CreateQuiz() {
     }
 
     if (Number(formData.duration) < 1) {
-      setError(
-        "Quiz duration must be at least 1 minute.",
-      );
+      setError("Quiz duration must be at least 1 minute.");
       return;
     }
 
     if (Number(formData.positiveMarks) < 0) {
-      setError(
-        "Positive marks cannot be negative.",
-      );
+      setError("Positive marks cannot be negative.");
       return;
     }
 
     if (Number(formData.negativeMarks) < 0) {
-      setError(
-        "Negative marks cannot be negative.",
-      );
+      setError("Negative marks cannot be negative.");
       return;
     }
 
     if (questions.length === 0) {
-      setError(
-        "Please add at least one question.",
-      );
+      setError("Please add at least one question.");
       return;
     }
 
@@ -178,37 +148,22 @@ function CreateQuiz() {
       const question = questions[i];
 
       if (!question.question.trim()) {
-        setError(
-          `Please enter Question ${i + 1}.`,
-        );
+        setError(`Please enter Question ${i + 1}.`);
         return;
       }
 
-      for (
-        let j = 0;
-        j < question.options.length;
-        j++
-      ) {
+      for (let j = 0; j < question.options.length; j++) {
         if (!question.options[j].trim()) {
-          setError(
-            `Please fill Option ${
-              j + 1
-            } in Question ${i + 1}.`,
-          );
+          setError(`Please fill Option ${j + 1} in Question ${i + 1}.`);
           return;
         }
       }
 
       if (
         question.correctAnswer < 0 ||
-        question.correctAnswer >=
-          question.options.length
+        question.correctAnswer >= question.options.length
       ) {
-        setError(
-          `Please select a correct answer for Question ${
-            i + 1
-          }.`,
-        );
+        setError(`Please select a correct answer for Question ${i + 1}.`);
         return;
       }
     }
@@ -216,38 +171,22 @@ function CreateQuiz() {
     setLoading(true);
 
     try {
-      const response = await api.post(
-        "/quizzes",
-        {
-          title: formData.title.trim(),
-          description:
-            formData.description.trim(),
-          duration: Number(formData.duration),
-          positiveMarks: Number(
-            formData.positiveMarks,
-          ),
-          negativeMarks: Number(
-            formData.negativeMarks,
-          ),
-          questions,
-        },
-      );
+      const response = await api.post("/quizzes", {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        duration: Number(formData.duration),
+        positiveMarks: Number(formData.positiveMarks),
+        negativeMarks: Number(formData.negativeMarks),
+        questions,
+      });
 
-      const shareCode =
-        response.data.quiz.shareCode;
+      const shareCode = response.data.quiz.shareCode;
 
       navigate(`/admin?created=${shareCode}`);
     } catch (error) {
-      if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-
-        navigate("/login");
-        return;
-      }
-
       setError(
-        error.response?.data?.message ||
+        error.userMessage ||
+          error.response?.data?.message ||
           "Unable to create quiz.",
       );
     } finally {
@@ -255,8 +194,7 @@ function CreateQuiz() {
     }
   };
 
-  const completedQuestions =
-    getCompletedQuestionCount();
+  const completedQuestions = getCompletedQuestionCount();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -282,17 +220,14 @@ function CreateQuiz() {
       <main className="mx-auto max-w-4xl px-5 py-8 pb-32 sm:py-10">
         {/* Header */}
         <header>
-          <p className="text-sm font-semibold text-slate-500">
-            Admin Panel
-          </p>
+          <p className="text-sm font-semibold text-slate-500">Admin Panel</p>
 
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             Create Quiz
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            Configure your quiz, set the marking scheme,
-            and add your questions.
+            Configure your quiz, set the marking scheme, and add your questions.
           </p>
         </header>
 
@@ -331,33 +266,24 @@ function CreateQuiz() {
           </div>
 
           <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
-            <span className="text-xs text-slate-500">
-              Negative marking
-            </span>
+            <span className="text-xs text-slate-500">Negative marking</span>
 
             <span className="text-xs font-bold text-slate-900">
-              {Number(formData.negativeMarks) ===
-              0
+              {Number(formData.negativeMarks) === 0
                 ? "None"
                 : `-${formData.negativeMarks}`}
             </span>
           </div>
         </section>
 
-        <form
-          onSubmit={handleSubmit}
-          className="mt-6 space-y-6"
-        >
+        <form onSubmit={handleSubmit} className="mt-6 space-y-6">
           {/* Quiz Details */}
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">
-                Quiz Details
-              </h2>
+              <h2 className="text-lg font-bold text-slate-900">Quiz Details</h2>
 
               <p className="mt-1 text-sm text-slate-500">
-                Set the basic information and marking
-                scheme.
+                Set the basic information and marking scheme.
               </p>
             </div>
 
@@ -458,9 +384,7 @@ function CreateQuiz() {
                     name="positiveMarks"
                     min="0"
                     step="0.25"
-                    value={
-                      formData.positiveMarks
-                    }
+                    value={formData.positiveMarks}
                     onChange={handleQuizChange}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   />
@@ -478,35 +402,21 @@ function CreateQuiz() {
                   <select
                     id="negative-marks"
                     name="negativeMarks"
-                    value={
-                      formData.negativeMarks
-                    }
+                    value={formData.negativeMarks}
                     onChange={handleQuizChange}
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                   >
-                    <option value="0">
-                      No Negative Marking
-                    </option>
+                    <option value="0">No Negative Marking</option>
 
-                    <option value="0.25">
-                      1/4 mark
-                    </option>
+                    <option value="0.25">1/4 mark</option>
 
-                    <option value="0.33">
-                      1/3 mark
-                    </option>
+                    <option value="0.33">1/3 mark</option>
 
-                    <option value="0.5">
-                      1/2 mark
-                    </option>
+                    <option value="0.5">1/2 mark</option>
 
-                    <option value="0.75">
-                      3/4 mark
-                    </option>
+                    <option value="0.75">3/4 mark</option>
 
-                    <option value="1">
-                      1 mark
-                    </option>
+                    <option value="1">1 mark</option>
                   </select>
                 </div>
               </div>
@@ -517,13 +427,10 @@ function CreateQuiz() {
           <section>
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h2 className="text-xl font-bold text-slate-900">
-                  Questions
-                </h2>
+                <h2 className="text-xl font-bold text-slate-900">Questions</h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  {completedQuestions} of{" "}
-                  {questions.length} completed
+                  {completedQuestions} of {questions.length} completed
                 </p>
               </div>
 
@@ -533,217 +440,150 @@ function CreateQuiz() {
             </div>
 
             <div className="mt-5 space-y-5">
-              {questions.map(
-                (
-                  question,
-                  questionIndex,
-                ) => {
-                  const isComplete =
-                    question.question.trim() &&
-                    question.options.every(
-                      (option) =>
-                        option.trim(),
-                    );
+              {questions.map((question, questionIndex) => {
+                const isComplete =
+                  question.question.trim() &&
+                  question.options.every((option) => option.trim());
 
-                  return (
-                    <div
-                      key={questionIndex}
-                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
-                    >
-                      {/* Question header */}
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ${
-                              isComplete
-                                ? "bg-slate-900 text-white"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            {questionIndex +
-                              1}
-                          </div>
-
-                          <div>
-                            <h3 className="text-sm font-bold text-slate-900">
-                              Question{" "}
-                              {questionIndex +
-                                1}
-                            </h3>
-
-                            <p className="text-[11px] text-slate-400">
-                              {isComplete
-                                ? "Ready"
-                                : "Incomplete"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {questions.length >
-                          1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeQuestion(
-                                questionIndex,
-                              )
-                            }
-                            className="rounded-lg px-2 py-1 text-xs font-semibold text-red-500 transition hover:bg-red-50 hover:text-red-600"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Question */}
-                      <div className="mt-5">
-                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Question
-                        </label>
-
-                        <textarea
-                          value={
-                            question.question
-                          }
-                          onChange={(e) =>
-                            handleQuestionChange(
-                              questionIndex,
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Enter your question..."
-                          rows={3}
-                          className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-                        />
-                      </div>
-
-                      {/* Options */}
-                      <div className="mt-5">
-                        <div className="mb-3 flex items-center justify-between">
-                          <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                            Options
-                          </label>
-
-                          <span className="text-[11px] text-slate-400">
-                            Select the correct answer below
-                          </span>
-                        </div>
-
-                        <div className="space-y-3">
-                          {question.options.map(
-                            (
-                              option,
-                              optionIndex,
-                            ) => {
-                              const isCorrect =
-                                question.correctAnswer ===
-                                optionIndex;
-
-                              return (
-                                <div
-                                  key={
-                                    optionIndex
-                                  }
-                                >
-                                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
-                                    Option{" "}
-                                    {String.fromCharCode(
-                                      65 +
-                                        optionIndex,
-                                    )}
-                                  </label>
-
-                                  <div className="flex gap-2">
-                                    <div
-                                      className={`flex w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
-                                        isCorrect
-                                          ? "bg-slate-900 text-white"
-                                          : "bg-slate-100 text-slate-500"
-                                      }`}
-                                    >
-                                      {String.fromCharCode(
-                                        65 +
-                                          optionIndex,
-                                      )}
-                                    </div>
-
-                                    <input
-                                      type="text"
-                                      value={
-                                        option
-                                      }
-                                      onChange={(
-                                        e,
-                                      ) =>
-                                        handleOptionChange(
-                                          questionIndex,
-                                          optionIndex,
-                                          e
-                                            .target
-                                            .value,
-                                        )
-                                      }
-                                      placeholder={`Enter option ${String.fromCharCode(
-                                        65 +
-                                          optionIndex,
-                                      )}`}
-                                      className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            },
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Correct Answer */}
-                      <div className="mt-5 rounded-xl bg-slate-50 p-4">
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">
-                          Correct Answer
-                        </label>
-
-                        <select
-                          value={
-                            question.correctAnswer
-                          }
-                          onChange={(e) =>
-                            handleCorrectAnswerChange(
-                              questionIndex,
-                              Number(
-                                e.target.value,
-                              ),
-                            )
-                          }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                return (
+                  <div
+                    key={questionIndex}
+                    className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+                  >
+                    {/* Question header */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold ${
+                            isComplete
+                              ? "bg-slate-900 text-white"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
                         >
-                          {question.options.map(
-                            (
-                              _,
-                              optionIndex,
-                            ) => (
-                              <option
-                                key={
-                                  optionIndex
-                                }
-                                value={
-                                  optionIndex
-                                }
-                              >
-                                Option{" "}
-                                {String.fromCharCode(
-                                  65 +
-                                    optionIndex,
-                                )}
-                              </option>
-                            ),
-                          )}
-                        </select>
+                          {questionIndex + 1}
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">
+                            Question {questionIndex + 1}
+                          </h3>
+
+                          <p className="text-[11px] text-slate-400">
+                            {isComplete ? "Ready" : "Incomplete"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {questions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestion(questionIndex)}
+                          className="rounded-lg px-2 py-1 text-xs font-semibold text-red-500 transition hover:bg-red-50 hover:text-red-600"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Question */}
+                    <div className="mt-5">
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Question
+                      </label>
+
+                      <textarea
+                        value={question.question}
+                        onChange={(e) =>
+                          handleQuestionChange(questionIndex, e.target.value)
+                        }
+                        placeholder="Enter your question..."
+                        rows={3}
+                        className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 text-sm leading-6 outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                      />
+                    </div>
+
+                    {/* Options */}
+                    <div className="mt-5">
+                      <div className="mb-3 flex items-center justify-between">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Options
+                        </label>
+
+                        <span className="text-[11px] text-slate-400">
+                          Select the correct answer below
+                        </span>
+                      </div>
+
+                      <div className="space-y-3">
+                        {question.options.map((option, optionIndex) => {
+                          const isCorrect =
+                            question.correctAnswer === optionIndex;
+
+                          return (
+                            <div key={optionIndex}>
+                              <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                                Option {String.fromCharCode(65 + optionIndex)}
+                              </label>
+
+                              <div className="flex gap-2">
+                                <div
+                                  className={`flex w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold ${
+                                    isCorrect
+                                      ? "bg-slate-900 text-white"
+                                      : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {String.fromCharCode(65 + optionIndex)}
+                                </div>
+
+                                <input
+                                  type="text"
+                                  value={option}
+                                  onChange={(e) =>
+                                    handleOptionChange(
+                                      questionIndex,
+                                      optionIndex,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={`Enter option ${String.fromCharCode(
+                                    65 + optionIndex,
+                                  )}`}
+                                  className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
-                  );
-                },
-              )}
+
+                    {/* Correct Answer */}
+                    <div className="mt-5 rounded-xl bg-slate-50 p-4">
+                      <label className="mb-2 block text-sm font-semibold text-slate-700">
+                        Correct Answer
+                      </label>
+
+                      <select
+                        value={question.correctAnswer}
+                        onChange={(e) =>
+                          handleCorrectAnswerChange(
+                            questionIndex,
+                            Number(e.target.value),
+                          )
+                        }
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                      >
+                        {question.options.map((_, optionIndex) => (
+                          <option key={optionIndex} value={optionIndex}>
+                            Option {String.fromCharCode(65 + optionIndex)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Add question */}
@@ -771,9 +611,7 @@ function CreateQuiz() {
                 disabled={loading}
                 className="w-full rounded-xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading
-                  ? "Creating Quiz..."
-                  : "Create Quiz"}
+                {loading ? "Creating Quiz..." : "Create Quiz"}
               </button>
             </div>
           </div>
