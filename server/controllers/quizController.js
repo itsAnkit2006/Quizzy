@@ -41,19 +41,23 @@ const createQuiz = async (req, res) => {
       });
     }
 
-    if (Number(duration) < 1) {
+    const numericDuration = Number(duration);
+    const numericPositiveMarks = Number(positiveMarks ?? 1);
+    const numericNegativeMarks = Number(negativeMarks ?? 0);
+
+    if (!Number.isFinite(numericDuration) || numericDuration < 1) {
       return res.status(400).json({
         message: "Duration must be at least 1 minute.",
       });
     }
 
-    if (Number(positiveMarks) < 0) {
+    if (!Number.isFinite(numericPositiveMarks) || numericPositiveMarks < 0) {
       return res.status(400).json({
         message: "Positive marks cannot be negative.",
       });
     }
 
-    if (Number(negativeMarks) < 0) {
+    if (!Number.isFinite(numericNegativeMarks) || numericNegativeMarks < 0) {
       return res.status(400).json({
         message: "Negative marks cannot be negative.",
       });
@@ -84,12 +88,13 @@ const createQuiz = async (req, res) => {
     const shareCode = await generateShareCode();
 
     const quiz = await Quiz.create({
-      title,
-      description: description || "",
-      duration: Number(duration),
-      positiveMarks: Number(positiveMarks ?? 1),
-      negativeMarks: Number(negativeMarks ?? 0),
+      title: title.trim(),
+      description: description?.trim() || "",
+      duration: numericDuration,
+      positiveMarks: numericPositiveMarks,
+      negativeMarks: numericNegativeMarks,
       questions,
+      questionCount: questions.length,
       shareCode,
       createdBy: req.user._id,
     });
@@ -103,7 +108,7 @@ const createQuiz = async (req, res) => {
         duration: quiz.duration,
         positiveMarks: quiz.positiveMarks,
         negativeMarks: quiz.negativeMarks,
-        questionCount: quiz.questions.length,
+        questionCount: quiz.questionCount,
         shareCode: quiz.shareCode,
       },
     });
@@ -118,14 +123,22 @@ const createQuiz = async (req, res) => {
 
 const getMyQuizzes = async (req, res) => {
   try {
-    const quizzes = await Quiz.find({
+    const quizzesPromise = Quiz.find({
       createdBy: req.user._id,
     })
       .select(
-        "title description duration positiveMarks negativeMarks shareCode createdAt questions",
+        "title description duration positiveMarks negativeMarks shareCode createdAt questionCount",
       )
       .sort({ createdAt: -1 })
       .lean();
+
+    const quizzes = await quizzesPromise;
+
+    if (quizzes.length === 0) {
+      return res.json({
+        quizzes: [],
+      });
+    }
 
     const quizIds = quizzes.map((quiz) => quiz._id);
 
@@ -139,9 +152,11 @@ const getMyQuizzes = async (req, res) => {
       {
         $group: {
           _id: "$quiz",
+
           attemptCount: {
             $sum: 1,
           },
+
           participants: {
             $addToSet: "$user",
           },
@@ -160,21 +175,20 @@ const getMyQuizzes = async (req, res) => {
     );
 
     const formattedQuizzes = quizzes.map((quiz) => {
-      const stats = statsMap.get(String(quiz._id)) || {
-        attemptCount: 0,
-        participantCount: 0,
-      };
+      const stats = statsMap.get(String(quiz._id));
 
       return {
-        ...quiz,
-
-        questionCount: quiz.questions.length,
-
-        attemptCount: stats.attemptCount,
-
-        participantCount: stats.participantCount,
-
-        questions: undefined,
+        _id: quiz._id,
+        title: quiz.title,
+        description: quiz.description,
+        duration: quiz.duration,
+        positiveMarks: quiz.positiveMarks,
+        negativeMarks: quiz.negativeMarks,
+        shareCode: quiz.shareCode,
+        createdAt: quiz.createdAt,
+        questionCount: quiz.questionCount,
+        attemptCount: stats?.attemptCount || 0,
+        participantCount: stats?.participantCount || 0,
       };
     });
 
@@ -655,7 +669,43 @@ const updateQuiz = async (req, res) => {
       questions.length === 0
     ) {
       return res.status(400).json({
-        message: "Title, duration and questions are required.",
+        message:
+          "Title, duration and questions are required.",
+      });
+    }
+
+    const numericDuration = Number(duration);
+    const numericPositiveMarks = Number(
+      positiveMarks ?? 1,
+    );
+    const numericNegativeMarks = Number(
+      negativeMarks ?? 0,
+    );
+
+    if (
+      !Number.isFinite(numericDuration) ||
+      numericDuration < 1
+    ) {
+      return res.status(400).json({
+        message: "Duration must be at least 1 minute.",
+      });
+    }
+
+    if (
+      !Number.isFinite(numericPositiveMarks) ||
+      numericPositiveMarks < 0
+    ) {
+      return res.status(400).json({
+        message: "Positive marks cannot be negative.",
+      });
+    }
+
+    if (
+      !Number.isFinite(numericNegativeMarks) ||
+      numericNegativeMarks < 0
+    ) {
+      return res.status(400).json({
+        message: "Negative marks cannot be negative.",
       });
     }
 
@@ -673,7 +723,13 @@ const updateQuiz = async (req, res) => {
         });
       }
 
-      if (question.options.some((option) => !option.trim())) {
+      if (
+        question.options.some(
+          (option) =>
+            typeof option !== "string" ||
+            !option.trim(),
+        )
+      ) {
         return res.status(400).json({
           message: "All options must be filled.",
         });
@@ -682,10 +738,11 @@ const updateQuiz = async (req, res) => {
 
     quiz.title = title.trim();
     quiz.description = description?.trim() || "";
-    quiz.duration = Number(duration);
-    quiz.positiveMarks = Number(positiveMarks ?? 1);
-    quiz.negativeMarks = Number(negativeMarks ?? 0);
+    quiz.duration = numericDuration;
+    quiz.positiveMarks = numericPositiveMarks;
+    quiz.negativeMarks = numericNegativeMarks;
     quiz.questions = questions;
+    quiz.questionCount = questions.length;
 
     await quiz.save();
 
@@ -695,6 +752,7 @@ const updateQuiz = async (req, res) => {
         id: quiz._id,
         title: quiz.title,
         shareCode: quiz.shareCode,
+        questionCount: quiz.questionCount,
       },
     });
   } catch (error) {
