@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -22,76 +23,78 @@ import Leaderboard from "./pages/Leaderboard";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Logged-in users */}
-        <Route element={<ProtectedRoute />}>
-          <Route
-            path="/dashboard"
-            element={<Dashboard />}
-          />
-
-          <Route
-            path="/dashboard/results"
-            element={<DashboardResults />}
-          />
-
-          {/* Admin only */}
-          <Route element={<AdminRoute />}>
+          {/* Logged-in users */}
+          <Route element={<ProtectedRoute />}>
             <Route
-              path="/admin"
-              element={<AdminDashboard />}
+              path="/dashboard"
+              element={<Dashboard />}
             />
 
             <Route
-              path="/admin/create"
-              element={<CreateQuiz />}
+              path="/dashboard/results"
+              element={<DashboardResults />}
             />
 
-            <Route
-              path="/admin/edit/:quizId"
-              element={<EditQuiz />}
-            />
+            {/* Admin only */}
+            <Route element={<AdminRoute />}>
+              <Route
+                path="/admin"
+                element={<AdminDashboard />}
+              />
 
-            <Route
-              path="/admin/quiz/:quizId/analytics"
-              element={<QuizAnalytics />}
-            />
+              <Route
+                path="/admin/create"
+                element={<CreateQuiz />}
+              />
 
-            <Route
-              path="/admin/quiz/:quizId/attempt/:attemptId"
-              element={<ParticipantAttempt />}
-            />
+              <Route
+                path="/admin/edit/:quizId"
+                element={<EditQuiz />}
+              />
+
+              <Route
+                path="/admin/quiz/:quizId/analytics"
+                element={<QuizAnalytics />}
+              />
+
+              <Route
+                path="/admin/quiz/:quizId/attempt/:attemptId"
+                element={<ParticipantAttempt />}
+              />
+            </Route>
           </Route>
-        </Route>
 
-        {/* Quiz */}
-        <Route
-          path="/quiz/:shareCode"
-          element={<Quiz />}
-        />
+          {/* Quiz */}
+          <Route
+            path="/quiz/:shareCode"
+            element={<Quiz />}
+          />
 
-        <Route
-          path="/quiz/:shareCode/attempt"
-          element={<QuizAttempt />}
-        />
+          <Route
+            path="/quiz/:shareCode/attempt"
+            element={<QuizAttempt />}
+          />
 
-        <Route
-          path="/quiz/:shareCode/result/:attemptId"
-          element={<QuizResult />}
-        />
+          <Route
+            path="/quiz/:shareCode/result/:attemptId"
+            element={<QuizResult />}
+          />
 
-        <Route
-          path="/quiz/:shareCode/leaderboard"
-          element={<Leaderboard />}
-        />
-      </Routes>
-    </BrowserRouter>
+          <Route
+            path="/quiz/:shareCode/leaderboard"
+            element={<Leaderboard />}
+          />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
