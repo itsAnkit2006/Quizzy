@@ -1212,10 +1212,10 @@ const downloadCertificate = async (req, res) => {
     // Certificate eligibility
     // =====================================================
 
-    if (percentage < 60) {
+    if (percentage < 40) {
       return res.status(403).json({
         message:
-          "Certificate is available only for participants scoring 60% or above.",
+          "Certificate is available only for participants scoring 40% or above.",
       });
     }
 
@@ -1650,15 +1650,15 @@ const downloadCertificate = async (req, res) => {
 
     doc
       .font("Times-Italic")
-      .fontSize(19)
+      .fontSize(14)
       .fillColor(NAVY)
       .text(
-        "Admin",
-        180,
+        "Princeraj Shaktawat",
+        160,
         signatureY,
         {
           align: "center",
-          width: 150,
+          width: 190,
         },
       );
 
@@ -1667,7 +1667,7 @@ const downloadCertificate = async (req, res) => {
       .fontSize(9)
       .fillColor(TEXT)
       .text(
-        "ADMIN",
+        "FOUNDER",
         180,
         signatureY + 32,
         {
