@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -16,34 +16,33 @@ function AdminDashboard() {
 
   const user = JSON.parse(localStorage.getItem("user"));
 
-  useEffect(() => {
-    const fetchQuizzes = async () => {
-      try {
-        const response = await api.get("/quizzes/my");
+  const fetchQuizzes = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-        setQuizzes(response.data.quizzes);
-      } catch (error) {
-        if (error.response?.status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+    try {
+      const response = await api.get("/quizzes/my");
 
-          navigate("/login");
-          return;
-        }
-
-        if (error.response?.status === 403) {
-          navigate("/dashboard");
-          return;
-        }
-
-        setError(error.response?.data?.message || "Unable to load quizzes.");
-      } finally {
-        setLoading(false);
+      setQuizzes(response.data.quizzes);
+    } catch (error) {
+      if (error.response?.status === 403) {
+        navigate("/dashboard");
+        return;
       }
-    };
 
-    fetchQuizzes();
+      setError(
+        error.userMessage ||
+          error.response?.data?.message ||
+          "Unable to load quizzes.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
+
+  useEffect(() => {
+    fetchQuizzes();
+  }, [fetchQuizzes]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -195,8 +194,21 @@ function AdminDashboard() {
 
         {/* Error */}
         {error && (
-          <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error}
+          <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
+            <p className="text-sm font-semibold text-red-700">
+              Unable to load quizzes
+            </p>
+
+            <p className="mt-1 text-sm text-red-600">{error}</p>
+
+            <button
+              type="button"
+              onClick={fetchQuizzes}
+              disabled={loading}
+              className="mt-4 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? "Retrying..." : "Try Again"}
+            </button>
           </div>
         )}
 
