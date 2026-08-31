@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import api from "../services/api";
 
 function QuizAttempt() {
@@ -8,15 +17,26 @@ function QuizAttempt() {
 
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [currentQuestion, setCurrentQuestion] =
+    useState(0);
 
-  const [timeLeft, setTimeLeft] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [timeLeft, setTimeLeft] =
+    useState(null);
 
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [showQuestionList, setShowQuestionList] = useState(false);
+  const [loading, setLoading] =
+    useState(true);
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [showSubmitModal, setShowSubmitModal] =
+    useState(false);
+
+  const [showQuestionList, setShowQuestionList] =
+    useState(false);
 
   const answersRef = useRef(answers);
   const submittingRef = useRef(submitting);
@@ -30,6 +50,108 @@ function QuizAttempt() {
     submittingRef.current = submitting;
   }, [submitting]);
 
+  // =========================================================
+  // Quiz copy protection
+  // =========================================================
+
+  useEffect(() => {
+    const preventContextMenu = (event) => {
+      event.preventDefault();
+    };
+
+    const preventCopy = (event) => {
+      event.preventDefault();
+    };
+
+    const preventCut = (event) => {
+      event.preventDefault();
+    };
+
+    const preventDrag = (event) => {
+      event.preventDefault();
+    };
+
+    const preventKeyboardShortcuts = (event) => {
+      const key = event.key.toLowerCase();
+
+      // Copy
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        key === "c"
+      ) {
+        event.preventDefault();
+      }
+
+      // Cut
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        key === "x"
+      ) {
+        event.preventDefault();
+      }
+
+      // Select all
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        key === "a"
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    document.addEventListener(
+      "contextmenu",
+      preventContextMenu,
+    );
+
+    document.addEventListener(
+      "copy",
+      preventCopy,
+    );
+
+    document.addEventListener(
+      "cut",
+      preventCut,
+    );
+
+    document.addEventListener(
+      "dragstart",
+      preventDrag,
+    );
+
+    document.addEventListener(
+      "keydown",
+      preventKeyboardShortcuts,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "contextmenu",
+        preventContextMenu,
+      );
+
+      document.removeEventListener(
+        "copy",
+        preventCopy,
+      );
+
+      document.removeEventListener(
+        "cut",
+        preventCut,
+      );
+
+      document.removeEventListener(
+        "dragstart",
+        preventDrag,
+      );
+
+      document.removeEventListener(
+        "keydown",
+        preventKeyboardShortcuts,
+      );
+    };
+  }, []);
+
   const questions = quiz?.questions || [];
 
   const answeredCount = useMemo(() => {
@@ -37,31 +159,51 @@ function QuizAttempt() {
   }, [answers]);
 
   const progress =
-    questions.length > 0 ? ((currentQuestion + 1) / questions.length) * 100 : 0;
+    questions.length > 0
+      ? ((currentQuestion + 1) /
+          questions.length) *
+        100
+      : 0;
+
+  // =========================================================
+  // Fetch quiz
+  // =========================================================
 
   const fetchQuiz = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await api.get(`/quizzes/${shareCode}`);
+      const response = await api.get(
+        `/quizzes/${shareCode}`,
+      );
 
-      const quizData = response.data.quiz;
+      const quizData =
+        response.data.quiz;
 
-      const startResponse = await api.post(`/quizzes/${shareCode}/start`);
+      const startResponse =
+        await api.post(
+          `/quizzes/${shareCode}/start`,
+        );
 
-      const attempt = startResponse.data.attempt;
+      const attempt =
+        startResponse.data.attempt;
 
       setQuiz(quizData);
 
       const restoredAnswers = {};
 
-      for (const answer of attempt.answers || []) {
+      for (
+        const answer of attempt.answers || []
+      ) {
         if (
           answer.selectedAnswer !== null &&
           answer.selectedAnswer !== undefined
         ) {
-          restoredAnswers[String(answer.questionId)] = answer.selectedAnswer;
+          restoredAnswers[
+            String(answer.questionId)
+          ] =
+            answer.selectedAnswer;
         }
       }
 
@@ -72,22 +214,31 @@ function QuizAttempt() {
           0,
           quizData.duration * 60 -
             Math.floor(
-              (Date.now() - new Date(attempt.startedAt).getTime()) / 1000,
+              (Date.now() -
+                new Date(
+                  attempt.startedAt,
+                ).getTime()) /
+                1000,
             ),
         ),
       );
     } catch (error) {
-      if (error.response?.status === 409) {
+      if (
+        error.response?.status === 409
+      ) {
         setError(
-          error.response?.data?.message ||
+          error.response?.data
+            ?.message ||
             "This quiz attempt cannot be started.",
         );
+
         return;
       }
 
       setError(
         error.userMessage ||
-          error.response?.data?.message ||
+          error.response?.data
+            ?.message ||
           "Unable to load quiz.",
       );
     } finally {
@@ -95,43 +246,75 @@ function QuizAttempt() {
     }
   }, [shareCode]);
 
-  const handleSubmit = useCallback(async () => {
-    if (submittingRef.current) {
-      return;
-    }
+  // =========================================================
+  // Submit quiz
+  // =========================================================
 
-    setSubmitting(true);
-    setError("");
-    setShowSubmitModal(false);
+  const handleSubmit =
+    useCallback(async () => {
+      if (submittingRef.current) {
+        return;
+      }
 
-    try {
-      const submittedAnswers = questions.map((question) => ({
-        questionId: question.id,
-        selectedAnswer: answersRef.current[question.id] ?? null,
-      }));
+      setSubmitting(true);
+      setError("");
+      setShowSubmitModal(false);
 
-      const response = await api.post(`/quizzes/${shareCode}/submit`, {
-        answers: submittedAnswers,
-      });
+      try {
+        const submittedAnswers =
+          questions.map(
+            (question) => ({
+              questionId:
+                question.id,
 
-      navigate(`/quiz/${shareCode}/result/${response.data.result.attemptId}`);
-    } catch (error) {
-      setError(
-        error.userMessage ||
-          error.response?.data?.message ||
-          "Unable to submit quiz.",
-      );
+              selectedAnswer:
+                answersRef.current[
+                  question.id
+                ] ?? null,
+            }),
+          );
 
-      setSubmitting(false);
-    }
-  }, [questions, shareCode, navigate]);
+        const response =
+          await api.post(
+            `/quizzes/${shareCode}/submit`,
+            {
+              answers: submittedAnswers,
+            },
+          );
+
+        navigate(
+          `/quiz/${shareCode}/result/${response.data.result.attemptId}`,
+        );
+      } catch (error) {
+        setError(
+          error.userMessage ||
+            error.response?.data
+              ?.message ||
+            "Unable to submit quiz.",
+        );
+
+        setSubmitting(false);
+      }
+    }, [
+      questions,
+      shareCode,
+      navigate,
+    ]);
 
   useEffect(() => {
     fetchQuiz();
   }, [fetchQuiz]);
 
+  // =========================================================
+  // Timer
+  // =========================================================
+
   useEffect(() => {
-    if (timeLeft === null || submitting || !quiz) {
+    if (
+      timeLeft === null ||
+      submitting ||
+      !quiz
+    ) {
       return;
     }
 
@@ -140,7 +323,9 @@ function QuizAttempt() {
         if (previous <= 1) {
           clearInterval(timer);
 
-          if (!submittingRef.current) {
+          if (
+            !submittingRef.current
+          ) {
             submitRef.current?.();
           }
 
@@ -151,24 +336,40 @@ function QuizAttempt() {
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () =>
+      clearInterval(timer);
   }, [quiz, submitting]);
 
   useEffect(() => {
-    submitRef.current = handleSubmit;
+    submitRef.current =
+      handleSubmit;
   }, [handleSubmit]);
 
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+  // =========================================================
+  // Helpers
+  // =========================================================
 
-    return `${String(minutes).padStart(2, "0")}:${String(
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(
+      seconds / 60,
+    );
+
+    const remainingSeconds =
+      seconds % 60;
+
+    return `${String(minutes).padStart(
+      2,
+      "0",
+    )}:${String(
       remainingSeconds,
     ).padStart(2, "0")}`;
   };
 
-  const selectAnswer = (optionIndex) => {
-    const questionId = questions[currentQuestion]?.id;
+  const selectAnswer = (
+    optionIndex,
+  ) => {
+    const questionId =
+      questions[currentQuestion]?.id;
 
     if (!questionId) {
       return;
@@ -176,13 +377,20 @@ function QuizAttempt() {
 
     setAnswers((previous) => ({
       ...previous,
-      [questionId]: optionIndex,
+      [questionId]:
+        optionIndex,
     }));
   };
 
   const goNext = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion((previous) => previous + 1);
+    if (
+      currentQuestion <
+      questions.length - 1
+    ) {
+      setCurrentQuestion(
+        (previous) =>
+          previous + 1,
+      );
 
       window.scrollTo({
         top: 0,
@@ -192,8 +400,13 @@ function QuizAttempt() {
   };
 
   const goPrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion((previous) => previous - 1);
+    if (
+      currentQuestion > 0
+    ) {
+      setCurrentQuestion(
+        (previous) =>
+          previous - 1,
+      );
 
       window.scrollTo({
         top: 0,
@@ -202,7 +415,9 @@ function QuizAttempt() {
     }
   };
 
-  const goToQuestion = (index) => {
+  const goToQuestion = (
+    index,
+  ) => {
     setCurrentQuestion(index);
     setShowQuestionList(false);
 
@@ -212,17 +427,27 @@ function QuizAttempt() {
     });
   };
 
+  // =========================================================
+  // Loading
+  // =========================================================
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5">
         <div className="text-center">
           <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
-          <p className="mt-3 text-sm text-slate-500">Loading quiz...</p>
+          <p className="mt-3 text-sm text-slate-500">
+            Loading quiz...
+          </p>
         </div>
       </div>
     );
   }
+
+  // =========================================================
+  // Error
+  // =========================================================
 
   if (error && !quiz) {
     return (
@@ -236,21 +461,27 @@ function QuizAttempt() {
             Unable to load quiz
           </h1>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">{error}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {error}
+          </p>
 
-          <div className="mt-6 flex gap-3 justify-center">
+          <div className="mt-6 flex justify-center gap-3">
             <button
               type="button"
               onClick={fetchQuiz}
               disabled={loading}
               className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Retrying..." : "Try Again"}
+              {loading
+                ? "Retrying..."
+                : "Try Again"}
             </button>
 
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() =>
+                navigate(-1)
+              }
               className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Go Back
@@ -261,25 +492,36 @@ function QuizAttempt() {
     );
   }
 
-  const question = questions[currentQuestion];
+  const question =
+    questions[currentQuestion];
 
   if (!question) {
     return null;
   }
 
-  const selectedAnswer = answers[question.id];
+  const selectedAnswer =
+    answers[question.id];
 
-  const isLastQuestion = currentQuestion === questions.length - 1;
+  const isLastQuestion =
+    currentQuestion ===
+    questions.length - 1;
 
-  const isFirstQuestion = currentQuestion === 0;
+  const isFirstQuestion =
+    currentQuestion === 0;
 
-  const isLowTime = timeLeft !== null && timeLeft <= 60;
+  const isLowTime =
+    timeLeft !== null &&
+    timeLeft <= 60;
 
-  const isVeryLowTime = timeLeft !== null && timeLeft <= 10;
+  const isVeryLowTime =
+    timeLeft !== null &&
+    timeLeft <= 10;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-3xl px-4 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -304,10 +546,14 @@ function QuizAttempt() {
                     : "bg-slate-100 text-slate-900"
               }`}
             >
-              <span className="text-xs">⏱</span>
+              <span className="text-xs">
+                ⏱
+              </span>
 
               <span className="font-mono text-sm font-bold">
-                {formatTime(timeLeft)}
+                {formatTime(
+                  timeLeft,
+                )}
               </span>
             </div>
           </div>
@@ -325,91 +571,183 @@ function QuizAttempt() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pb-32 pt-5">
-        {/* Question header */}
+        {/* =====================================================
+            QUESTION HEADER
+        ===================================================== */}
         <div className="mb-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-slate-900">
-                Question {currentQuestion + 1}
+                Question{" "}
+                {currentQuestion +
+                  1}
+
                 <span className="font-normal text-slate-400">
                   {" "}
-                  of {questions.length}
+                  of{" "}
+                  {questions.length}
                 </span>
               </p>
 
               <p className="mt-1 text-xs text-slate-500">
-                {answeredCount} of {questions.length} answered
+                {answeredCount} of{" "}
+                {questions.length}{" "}
+                answered
               </p>
             </div>
 
             <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">
-              {Math.round(progress)}%
+              {Math.round(
+                progress,
+              )}
+              %
             </span>
           </div>
         </div>
 
-        {/* Question card */}
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-          <h2 className="text-xl font-bold leading-8 tracking-tight text-slate-900 sm:text-2xl sm:leading-9">
+        {/* =====================================================
+            QUESTION CARD
+        ===================================================== */}
+        <section className="select-none rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          {/* English question */}
+          <h2 className="select-none text-xl font-bold leading-8 tracking-tight text-slate-900 sm:text-2xl sm:leading-9">
             {question.question}
           </h2>
 
-          {/* Options */}
-          <div className="mt-7 space-y-3">
-            {question.options.map((option, index) => {
-              const selected = selectedAnswer === index;
+          {/* Hindi question */}
+          {question.questionHindi && (
+            <p className="mt-3 select-none text-lg font-medium leading-8 text-slate-600 sm:text-xl">
+              {question.questionHindi}
+            </p>
+          )}
 
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => selectAnswer(index)}
-                  className={`group flex min-h-[60px] w-full items-center gap-3 rounded-xl border p-3.5 text-left transition active:scale-[0.99] ${
-                    selected
-                      ? "border-slate-900 bg-slate-900 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                  }`}
-                >
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${
+          {/* Divider */}
+          {question.questionHindi && (
+            <div className="mt-5 border-t border-slate-100" />
+          )}
+
+          {/* ===================================================
+              OPTIONS
+          =================================================== */}
+          <div className="mt-7 space-y-3">
+            {question.options.map(
+              (
+                option,
+                index,
+              ) => {
+                const selected =
+                  selectedAnswer ===
+                  index;
+
+                /*
+                 * New bilingual format:
+                 *
+                 * {
+                 *   english: "Jaipur",
+                 *   hindi: "जयपुर"
+                 * }
+                 *
+                 * The fallback below allows the UI to
+                 * still display old string-based questions.
+                 */
+
+                const englishOption =
+                  typeof option ===
+                  "object"
+                    ? option.english ||
+                      ""
+                    : option;
+
+                const hindiOption =
+                  typeof option ===
+                  "object"
+                    ? option.hindi ||
+                      ""
+                    : "";
+
+                return (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() =>
+                      selectAnswer(
+                        index,
+                      )
+                    }
+                    className={`group flex min-h-[70px] w-full select-none items-start gap-3 rounded-xl border p-3.5 text-left transition active:scale-[0.99] ${
                       selected
-                        ? "bg-white text-slate-900"
-                        : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                        ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
-                    {String.fromCharCode(65 + index)}
-                  </span>
-
-                  <span className="flex-1 text-sm font-medium leading-6">
-                    {option}
-                  </span>
-
-                  {selected && (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-900">
-                      ✓
+                    {/* Option letter */}
+                    <span
+                      className={`mt-0.5 flex h-9 w-9 shrink-0 select-none items-center justify-center rounded-lg text-sm font-bold ${
+                        selected
+                          ? "bg-white text-slate-900"
+                          : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                      }`}
+                    >
+                      {String.fromCharCode(
+                        65 + index,
+                      )}
                     </span>
-                  )}
-                </button>
-              );
-            })}
+
+                    {/* Option text */}
+                    <span className="flex-1 select-none">
+                      {/* English */}
+                      <span className="block select-none text-sm font-medium leading-6">
+                        {englishOption}
+                      </span>
+
+                      {/* Hindi */}
+                      {hindiOption && (
+                        <span
+                          className={`mt-0.5 block select-none text-sm leading-6 ${
+                            selected
+                              ? "text-slate-200"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          {hindiOption}
+                        </span>
+                      )}
+                    </span>
+
+                    {/* Selected check */}
+                    {selected && (
+                      <span className="flex h-6 w-6 shrink-0 select-none items-center justify-center rounded-full bg-white text-xs font-bold text-slate-900">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              },
+            )}
           </div>
 
           {/* Clear answer */}
-          {selectedAnswer !== undefined && (
+          {selectedAnswer !==
+            undefined && (
             <button
               type="button"
               onClick={() => {
-                const questionId = question.id;
+                const questionId =
+                  question.id;
 
-                setAnswers((previous) => {
-                  const updated = {
-                    ...previous,
-                  };
+                setAnswers(
+                  (previous) => {
+                    const updated = {
+                      ...previous,
+                    };
 
-                  delete updated[questionId];
+                    delete updated[
+                      questionId
+                    ];
 
-                  return updated;
-                });
+                    return updated;
+                  },
+                );
               }}
               className="mt-4 text-xs font-medium text-slate-400 hover:text-slate-700"
             >
@@ -418,11 +756,18 @@ function QuizAttempt() {
           )}
         </section>
 
-        {/* Question overview */}
+        {/* =====================================================
+            QUESTION OVERVIEW
+        ===================================================== */}
         <section className="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <button
             type="button"
-            onClick={() => setShowQuestionList((previous) => !previous)}
+            onClick={() =>
+              setShowQuestionList(
+                (previous) =>
+                  !previous,
+              )
+            }
             className="flex w-full items-center justify-between p-4 text-left"
           >
             <div>
@@ -431,41 +776,61 @@ function QuizAttempt() {
               </p>
 
               <p className="mt-1 text-xs text-slate-500">
-                {answeredCount} answered · {questions.length - answeredCount}{" "}
+                {answeredCount}{" "}
+                answered ·{" "}
+                {questions.length -
+                  answeredCount}{" "}
                 remaining
               </p>
             </div>
 
             <span className="text-sm font-bold text-slate-400">
-              {showQuestionList ? "⌃" : "⌄"}
+              {showQuestionList
+                ? "⌃"
+                : "⌄"}
             </span>
           </button>
 
           {showQuestionList && (
             <div className="border-t border-slate-100 p-4">
               <div className="grid grid-cols-5 gap-2 sm:grid-cols-8">
-                {questions.map((item, index) => {
-                  const answered = answers[item.id] !== undefined;
+                {questions.map(
+                  (
+                    item,
+                    index,
+                  ) => {
+                    const answered =
+                      answers[
+                        item.id
+                      ] !==
+                      undefined;
 
-                  const current = index === currentQuestion;
+                    const current =
+                      index ===
+                      currentQuestion;
 
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => goToQuestion(index)}
-                      className={`h-10 rounded-xl text-xs font-bold transition ${
-                        current
-                          ? "bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-2"
-                          : answered
-                            ? "bg-slate-200 text-slate-900"
-                            : "bg-slate-50 text-slate-500 hover:bg-slate-100"
-                      }`}
-                    >
-                      {index + 1}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() =>
+                          goToQuestion(
+                            index,
+                          )
+                        }
+                        className={`h-10 select-none rounded-xl text-xs font-bold transition ${
+                          current
+                            ? "bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-2"
+                            : answered
+                              ? "bg-slate-200 text-slate-900"
+                              : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+                        }`}
+                      >
+                        {index + 1}
+                      </button>
+                    );
+                  },
+                )}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-500">
@@ -489,14 +854,18 @@ function QuizAttempt() {
         </section>
       </main>
 
-      {/* Bottom navigation */}
+      {/* =====================================================
+          BOTTOM NAVIGATION
+      ===================================================== */}
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 p-3 backdrop-blur">
         <div className="mx-auto max-w-3xl">
           <div className="flex gap-2">
             <button
               type="button"
               onClick={goPrevious}
-              disabled={isFirstQuestion}
+              disabled={
+                isFirstQuestion
+              }
               className="flex-1 rounded-xl border border-slate-300 px-4 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               ← Previous
@@ -505,7 +874,11 @@ function QuizAttempt() {
             {isLastQuestion ? (
               <button
                 type="button"
-                onClick={() => setShowSubmitModal(true)}
+                onClick={() =>
+                  setShowSubmitModal(
+                    true,
+                  )
+                }
                 className="flex-1 rounded-xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-[0.99]"
               >
                 Submit Quiz
@@ -523,7 +896,9 @@ function QuizAttempt() {
         </div>
       </div>
 
-      {/* Submit modal */}
+      {/* =====================================================
+          SUBMIT MODAL
+      ===================================================== */}
       {showSubmitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
@@ -537,24 +912,43 @@ function QuizAttempt() {
 
             <p className="mt-2 text-center text-sm leading-6 text-slate-500">
               You have answered{" "}
-              <strong className="text-slate-700">{answeredCount}</strong> out of{" "}
-              <strong className="text-slate-700">{questions.length}</strong>{" "}
+              <strong className="text-slate-700">
+                {answeredCount}
+              </strong>{" "}
+              out of{" "}
+              <strong className="text-slate-700">
+                {questions.length}
+              </strong>{" "}
               questions.
             </p>
 
-            {answeredCount < questions.length && (
+            {answeredCount <
+              questions.length && (
               <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                 You still have{" "}
-                <strong>{questions.length - answeredCount}</strong> unanswered
+                <strong>
+                  {questions.length -
+                    answeredCount}
+                </strong>{" "}
+                unanswered
                 question
-                {questions.length - answeredCount !== 1 ? "s" : ""}.
+                {questions.length -
+                  answeredCount !==
+                1
+                  ? "s"
+                  : ""}
+                .
               </div>
             )}
 
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
-                onClick={() => setShowSubmitModal(false)}
+                onClick={() =>
+                  setShowSubmitModal(
+                    false,
+                  )
+                }
                 disabled={submitting}
                 className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
@@ -563,18 +957,24 @@ function QuizAttempt() {
 
               <button
                 type="button"
-                onClick={() => handleSubmit()}
+                onClick={() =>
+                  handleSubmit()
+                }
                 disabled={submitting}
                 className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting ? "Submitting..." : "Submit"}
+                {submitting
+                  ? "Submitting..."
+                  : "Submit"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Error */}
+      {/* =====================================================
+          ERROR
+      ===================================================== */}
       {error && quiz && (
         <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-xl rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 shadow-lg">
           {error}

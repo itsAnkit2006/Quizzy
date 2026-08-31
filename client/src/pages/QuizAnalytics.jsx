@@ -82,7 +82,7 @@ function QuizAnalytics() {
   // =========================================================
 
   const handleDownloadCertificate = async (entry) => {
-    if (!entry.certificateEligible) {
+    if (Number(entry.percentage || 0) < 40) {
       return;
     }
 
@@ -530,7 +530,7 @@ function QuizAnalytics() {
                     </button>
 
                     {/* Certificate */}
-                    {entry.certificateEligible && (
+                    {Number(entry.percentage || 0) >= 40 && (
                       <button
                         type="button"
                         onClick={() =>

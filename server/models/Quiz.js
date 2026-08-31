@@ -1,5 +1,24 @@
 const mongoose = require("mongoose");
 
+const optionSchema = new mongoose.Schema(
+  {
+    english: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    hindi: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+  },
+  {
+    _id: false,
+  },
+);
+
 const questionSchema = new mongoose.Schema(
   {
     question: {
@@ -8,12 +27,20 @@ const questionSchema = new mongoose.Schema(
       trim: true,
     },
 
+    questionHindi: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     options: {
-      type: [String],
+      type: [optionSchema],
       required: true,
       validate: {
-        validator: (options) => options.length >= 2,
-        message: "A question must have at least 2 options.",
+        validator: (options) =>
+          options.length >= 2,
+        message:
+          "A question must have at least 2 options.",
       },
     },
 
@@ -68,8 +95,10 @@ const quizSchema = new mongoose.Schema(
       type: [questionSchema],
       required: true,
       validate: {
-        validator: (questions) => questions.length > 0,
-        message: "Quiz must contain at least one question.",
+        validator: (questions) =>
+          questions.length > 0,
+        message:
+          "Quiz must contain at least one question.",
       },
     },
 
@@ -105,4 +134,5 @@ quizSchema.index({
   createdBy: 1,
 });
 
-module.exports = mongoose.model("Quiz", quizSchema);
+module.exports =
+  mongoose.model("Quiz", quizSchema);

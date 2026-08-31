@@ -30,6 +30,10 @@ const createQuiz = async (req, res) => {
       questions,
     } = req.body;
 
+    // =====================================================
+    // Basic validation
+    // =====================================================
+
     if (!title || !duration || !questions) {
       return res.status(400).json({
         message: "Title, duration and questions are required.",
@@ -42,8 +46,14 @@ const createQuiz = async (req, res) => {
       });
     }
 
+    // =====================================================
+    // Numeric validation
+    // =====================================================
+
     const numericDuration = Number(duration);
+
     const numericPositiveMarks = Number(positiveMarks ?? 1);
+
     const numericNegativeMarks = Number(negativeMarks ?? 0);
 
     if (!Number.isFinite(numericDuration) || numericDuration < 1) {
@@ -64,15 +74,81 @@ const createQuiz = async (req, res) => {
       });
     }
 
-    for (const question of questions) {
+    // =====================================================
+    // Question validation
+    // =====================================================
+
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+
       if (
-        !question.question ||
-        !Array.isArray(question.options) ||
-        question.options.length < 2 ||
-        typeof question.correctAnswer !== "number"
+        !question ||
+        typeof question.question !== "string" ||
+        !question.question.trim()
       ) {
         return res.status(400).json({
-          message: "Invalid question format.",
+          message: `Question ${i + 1} is invalid or empty.`,
+        });
+      }
+
+      // Hindi question is optional
+      if (
+        question.questionHindi !== undefined &&
+        typeof question.questionHindi !== "string"
+      ) {
+        return res.status(400).json({
+          message: `Hindi question in Question ${i + 1} is invalid.`,
+        });
+      }
+
+      if (!Array.isArray(question.options) || question.options.length !== 4) {
+        return res.status(400).json({
+          message: `Question ${i + 1} must contain exactly 4 options.`,
+        });
+      }
+
+      // ===================================================
+      // Option validation
+      // ===================================================
+
+      for (let j = 0; j < question.options.length; j++) {
+        const option = question.options[j];
+
+        // Support bilingual option object
+        if (!option || typeof option !== "object") {
+          return res.status(400).json({
+            message: `Option ${String.fromCharCode(65 + j)} in Question ${
+              i + 1
+            } is invalid.`,
+          });
+        }
+
+        if (typeof option.english !== "string" || !option.english.trim()) {
+          return res.status(400).json({
+            message: `English text for Option ${String.fromCharCode(
+              65 + j,
+            )} in Question ${i + 1} is required.`,
+          });
+        }
+
+        // Hindi is optional so existing/manual
+        // questions can still work.
+        if (option.hindi !== undefined && typeof option.hindi !== "string") {
+          return res.status(400).json({
+            message: `Hindi text for Option ${String.fromCharCode(
+              65 + j,
+            )} in Question ${i + 1} is invalid.`,
+          });
+        }
+      }
+
+      // ===================================================
+      // Correct answer validation
+      // ===================================================
+
+      if (typeof question.correctAnswer !== "number") {
+        return res.status(400).json({
+          message: `Correct answer for Question ${i + 1} is invalid.`,
         });
       }
 
@@ -81,35 +157,65 @@ const createQuiz = async (req, res) => {
         question.correctAnswer >= question.options.length
       ) {
         return res.status(400).json({
-          message: "Invalid correct answer.",
+          message: `Correct answer for Question ${
+            i + 1
+          } must be between A and D.`,
         });
       }
     }
 
+    // =====================================================
+    // Generate unique share code
+    // =====================================================
+
     const shareCode = await generateShareCode();
+
+    // =====================================================
+    // Create quiz
+    // =====================================================
 
     const quiz = await Quiz.create({
       title: title.trim(),
+
       description: description?.trim() || "",
+
       duration: numericDuration,
+
       positiveMarks: numericPositiveMarks,
+
       negativeMarks: numericNegativeMarks,
+
       questions,
+
       questionCount: questions.length,
+
       shareCode,
+
       createdBy: req.user._id,
     });
 
+    // =====================================================
+    // Response
+    // =====================================================
+
     res.status(201).json({
       message: "Quiz created successfully.",
+
       quiz: {
         id: quiz._id,
+
         title: quiz.title,
+
         description: quiz.description,
+
         duration: quiz.duration,
+
         positiveMarks: quiz.positiveMarks,
+
         negativeMarks: quiz.negativeMarks,
+
         questionCount: quiz.questionCount,
+
         shareCode: quiz.shareCode,
       },
     });
@@ -222,7 +328,14 @@ const getQuizByShareCode = async (req, res) => {
     const publicQuestions = quiz.questions.map((question, index) => ({
       id: question._id,
       number: index + 1,
+
+      // English question
       question: question.question,
+
+      // Hindi question
+      questionHindi: question.questionHindi || "",
+
+      // English + Hindi options
       options: question.options,
     }));
 
@@ -826,48 +939,35 @@ const getQuizAnalytics = async (req, res) => {
 
     if (attempts.length > 0) {
       const totalScore = attempts.reduce(
-        (sum, attempt) =>
-          sum + Number(attempt.score || 0),
+        (sum, attempt) => sum + Number(attempt.score || 0),
         0,
       );
 
       const totalTime = attempts.reduce(
-        (sum, attempt) =>
-          sum + Number(attempt.timeTaken || 0),
+        (sum, attempt) => sum + Number(attempt.timeTaken || 0),
         0,
       );
 
-      averageScore = Number(
-        (totalScore / attempts.length).toFixed(2),
-      );
+      averageScore = Number((totalScore / attempts.length).toFixed(2));
 
       highestScore = Math.max(
-        ...attempts.map((attempt) =>
-          Number(attempt.score || 0),
-        ),
+        ...attempts.map((attempt) => Number(attempt.score || 0)),
       );
 
-      averageTime = Math.round(
-        totalTime / attempts.length,
-      );
+      averageTime = Math.round(totalTime / attempts.length);
     }
 
     // =====================================================
     // Quiz scoring information
     // =====================================================
 
-    const questionCount =
-      Number(quiz.questionCount) ||
-      quiz.questions.length;
+    const questionCount = Number(quiz.questionCount) || quiz.questions.length;
 
-    const positiveMarks =
-      Number(quiz.positiveMarks) || 0;
+    const positiveMarks = Number(quiz.positiveMarks) || 0;
 
-    const negativeMarks =
-      Number(quiz.negativeMarks) || 0;
+    const negativeMarks = Number(quiz.negativeMarks) || 0;
 
-    const maximumScore =
-      questionCount * positiveMarks;
+    const maximumScore = questionCount * positiveMarks;
 
     // =====================================================
     // Leaderboard
@@ -892,10 +992,7 @@ const getQuizAnalytics = async (req, res) => {
         }
 
         // Earlier submission first
-        return (
-          new Date(a.submittedAt) -
-          new Date(b.submittedAt)
-        );
+        return new Date(a.submittedAt) - new Date(b.submittedAt);
       })
       .map((attempt, index) => {
         const score = Number(attempt.score || 0);
@@ -904,13 +1001,7 @@ const getQuizAnalytics = async (req, res) => {
 
         if (maximumScore > 0) {
           percentage = Number(
-            Math.min(
-              100,
-              Math.max(
-                0,
-                (score / maximumScore) * 100,
-              ),
-            ).toFixed(1),
+            Math.min(100, Math.max(0, (score / maximumScore) * 100)).toFixed(1),
           );
         }
 
@@ -919,37 +1010,22 @@ const getQuizAnalytics = async (req, res) => {
 
           attemptId: attempt._id,
 
-          username:
-            attempt.user?.username ||
-            "Unknown User",
+          username: attempt.user?.username || "Unknown User",
 
           score,
 
           percentage,
 
           // 60% or higher = certificate eligible
-          certificateEligible:
-            percentage >= 60,
+          certificateEligible: percentage >= 60,
 
-          correctAnswers:
-            Number(
-              attempt.correctAnswers || 0,
-            ),
+          correctAnswers: Number(attempt.correctAnswers || 0),
 
-          wrongAnswers:
-            Number(
-              attempt.wrongAnswers || 0,
-            ),
+          wrongAnswers: Number(attempt.wrongAnswers || 0),
 
-          unanswered:
-            Number(
-              attempt.unanswered || 0,
-            ),
+          unanswered: Number(attempt.unanswered || 0),
 
-          timeTaken:
-            Number(
-              attempt.timeTaken || 0,
-            ),
+          timeTaken: Number(attempt.timeTaken || 0),
         };
       });
 
@@ -957,62 +1033,43 @@ const getQuizAnalytics = async (req, res) => {
     // Question analytics
     // =====================================================
 
-    const questionAnalytics =
-      quiz.questions.map(
-        (question, questionIndex) => {
-          let correct = 0;
-          let wrong = 0;
-          let unanswered = 0;
+    const questionAnalytics = quiz.questions.map((question, questionIndex) => {
+      let correct = 0;
+      let wrong = 0;
+      let unanswered = 0;
 
-          for (const attempt of attempts) {
-            const answer =
-              attempt.answers.find(
-                (item) =>
-                  String(item.questionId) ===
-                  String(question._id),
-              );
+      for (const attempt of attempts) {
+        const answer = attempt.answers.find(
+          (item) => String(item.questionId) === String(question._id),
+        );
 
-            if (
-              !answer ||
-              answer.selectedAnswer === null ||
-              answer.selectedAnswer === undefined
-            ) {
-              unanswered++;
-            } else if (
-              answer.selectedAnswer ===
-              question.correctAnswer
-            ) {
-              correct++;
-            } else {
-              wrong++;
-            }
-          }
+        if (
+          !answer ||
+          answer.selectedAnswer === null ||
+          answer.selectedAnswer === undefined
+        ) {
+          unanswered++;
+        } else if (answer.selectedAnswer === question.correctAnswer) {
+          correct++;
+        } else {
+          wrong++;
+        }
+      }
 
-          const total =
-            correct +
-            wrong +
-            unanswered;
+      const total = correct + wrong + unanswered;
 
-          const correctPercentage =
-            total > 0
-              ? Number(
-                  (
-                    (correct / total) *
-                    100
-                  ).toFixed(1),
-                )
-              : 0;
+      const correctPercentage =
+        total > 0 ? Number(((correct / total) * 100).toFixed(1)) : 0;
 
-          return {
-            number: questionIndex + 1,
-            question: question.question,
-            correct,
-            wrong,
-            unanswered,
-            correctPercentage,
-          };
-        },
-      );
+      return {
+        number: questionIndex + 1,
+        question: question.question,
+        correct,
+        wrong,
+        unanswered,
+        correctPercentage,
+      };
+    });
 
     // =====================================================
     // Response
@@ -1048,14 +1105,10 @@ const getQuizAnalytics = async (req, res) => {
       questionAnalytics,
     });
   } catch (error) {
-    console.error(
-      "Quiz analytics error:",
-      error,
-    );
+    console.error("Quiz analytics error:", error);
 
     res.status(500).json({
-      message:
-        "Unable to load quiz analytics.",
+      message: "Unable to load quiz analytics.",
     });
   }
 };
@@ -1179,33 +1232,22 @@ const downloadCertificate = async (req, res) => {
     // Calculate score
     // =====================================================
 
-    const questionCount =
-      Number(quiz.questionCount) ||
-      quiz.questions.length;
+    const questionCount = Number(quiz.questionCount) || quiz.questions.length;
 
-    const positiveMarks =
-      Number(quiz.positiveMarks) || 0;
+    const positiveMarks = Number(quiz.positiveMarks) || 0;
 
-    const maximumScore =
-      questionCount * positiveMarks;
+    const maximumScore = questionCount * positiveMarks;
 
     if (maximumScore <= 0) {
       return res.status(400).json({
-        message:
-          "Certificate cannot be generated for this quiz.",
+        message: "Certificate cannot be generated for this quiz.",
       });
     }
 
     const score = Number(attempt.score || 0);
 
     const percentage = Number(
-      Math.min(
-        100,
-        Math.max(
-          0,
-          (score / maximumScore) * 100,
-        ),
-      ).toFixed(1),
+      Math.min(100, Math.max(0, (score / maximumScore) * 100)).toFixed(1),
     );
 
     // =====================================================
@@ -1223,26 +1265,19 @@ const downloadCertificate = async (req, res) => {
     // Participant information
     // =====================================================
 
-    const username =
-      attempt.user?.username ||
-      "Participant";
+    const username = attempt.user?.username || "Participant";
 
     const submittedDate = attempt.submittedAt
-      ? new Date(
-          attempt.submittedAt,
-        ).toLocaleDateString("en-IN", {
+      ? new Date(attempt.submittedAt).toLocaleDateString("en-IN", {
           day: "numeric",
           month: "long",
           year: "numeric",
         })
-      : new Date().toLocaleDateString(
-          "en-IN",
-          {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          },
-        );
+      : new Date().toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
 
     // =====================================================
     // PDF
@@ -1283,14 +1318,7 @@ const downloadCertificate = async (req, res) => {
     // Background
     // =====================================================
 
-    doc
-      .rect(
-        0,
-        0,
-        pageWidth,
-        pageHeight,
-      )
-      .fill(CREAM);
+    doc.rect(0, 0, pageWidth, pageHeight).fill(CREAM);
 
     // =====================================================
     // Decorative top-left ribbon
@@ -1351,13 +1379,7 @@ const downloadCertificate = async (req, res) => {
     doc
       .lineWidth(2)
       .strokeColor(BORDER)
-      .roundedRect(
-        18,
-        18,
-        pageWidth - 36,
-        pageHeight - 36,
-        4,
-      )
+      .roundedRect(18, 18, pageWidth - 36, pageHeight - 36, 4)
       .stroke();
 
     // =====================================================
@@ -1367,13 +1389,7 @@ const downloadCertificate = async (req, res) => {
     doc
       .lineWidth(0.8)
       .strokeColor("#d9d1bd")
-      .roundedRect(
-        32,
-        32,
-        pageWidth - 64,
-        pageHeight - 64,
-        3,
-      )
+      .roundedRect(32, 32, pageWidth - 64, pageHeight - 64, 3)
       .stroke();
 
     // =====================================================
@@ -1396,30 +1412,20 @@ const downloadCertificate = async (req, res) => {
       .font("Helvetica-Bold")
       .fontSize(24)
       .fillColor(NAVY)
-      .text(
-        "QUIZZY",
-        0,
-        72,
-        {
-          align: "center",
-          width: pageWidth,
-        },
-      );
+      .text("QUIZZY", 0, 72, {
+        align: "center",
+        width: pageWidth,
+      });
 
     doc
       .font("Helvetica")
       .fontSize(9)
       .fillColor(GOLD)
-      .text(
-        "LEARN  •  CHALLENGE  •  GROW",
-        0,
-        99,
-        {
-          align: "center",
-          width: pageWidth,
-          characterSpacing: 1.5,
-        },
-      );
+      .text("LEARN  •  CHALLENGE  •  GROW", 0, 99, {
+        align: "center",
+        width: pageWidth,
+        characterSpacing: 1.5,
+      });
 
     // =====================================================
     // Main title
@@ -1429,15 +1435,10 @@ const downloadCertificate = async (req, res) => {
       .font("Times-Bold")
       .fontSize(42)
       .fillColor(NAVY)
-      .text(
-        "CERTIFICATE",
-        0,
-        130,
-        {
-          align: "center",
-          width: pageWidth,
-        },
-      );
+      .text("CERTIFICATE", 0, 130, {
+        align: "center",
+        width: pageWidth,
+      });
 
     // Gold divider
     doc
@@ -1451,16 +1452,11 @@ const downloadCertificate = async (req, res) => {
       .font("Times-Roman")
       .fontSize(19)
       .fillColor(GOLD)
-      .text(
-        "OF ACHIEVEMENT",
-        0,
-        191,
-        {
-          align: "center",
-          width: pageWidth,
-          characterSpacing: 2,
-        },
-      );
+      .text("OF ACHIEVEMENT", 0, 191, {
+        align: "center",
+        width: pageWidth,
+        characterSpacing: 2,
+      });
 
     // =====================================================
     // Presented to
@@ -1470,16 +1466,11 @@ const downloadCertificate = async (req, res) => {
       .font("Helvetica")
       .fontSize(11)
       .fillColor(NAVY)
-      .text(
-        "THIS CERTIFICATE IS PROUDLY PRESENTED TO",
-        0,
-        230,
-        {
-          align: "center",
-          width: pageWidth,
-          characterSpacing: 1.2,
-        },
-      );
+      .text("THIS CERTIFICATE IS PROUDLY PRESENTED TO", 0, 230, {
+        align: "center",
+        width: pageWidth,
+        characterSpacing: 1.2,
+      });
 
     // =====================================================
     // Participant name
@@ -1487,21 +1478,12 @@ const downloadCertificate = async (req, res) => {
 
     doc
       .font("Times-Italic")
-      .fontSize(
-        username.length > 25
-          ? 30
-          : 36,
-      )
+      .fontSize(username.length > 25 ? 30 : 36)
       .fillColor(NAVY)
-      .text(
-        username,
-        120,
-        258,
-        {
-          align: "center",
-          width: pageWidth - 240,
-        },
-      );
+      .text(username, 120, 258, {
+        align: "center",
+        width: pageWidth - 240,
+      });
 
     // Name underline
     doc
@@ -1519,15 +1501,10 @@ const downloadCertificate = async (req, res) => {
       .font("Helvetica")
       .fontSize(11)
       .fillColor(TEXT)
-      .text(
-        "for successfully completing the quiz",
-        0,
-        318,
-        {
-          align: "center",
-          width: pageWidth,
-        },
-      );
+      .text("for successfully completing the quiz", 0, 318, {
+        align: "center",
+        width: pageWidth,
+      });
 
     // =====================================================
     // Quiz title
@@ -1535,21 +1512,12 @@ const downloadCertificate = async (req, res) => {
 
     doc
       .font("Helvetica-Bold")
-      .fontSize(
-        quiz.title.length > 55
-          ? 15
-          : 18,
-      )
+      .fontSize(quiz.title.length > 55 ? 15 : 18)
       .fillColor(NAVY)
-      .text(
-        quiz.title,
-        120,
-        342,
-        {
-          align: "center",
-          width: pageWidth - 240,
-        },
-      );
+      .text(quiz.title, 120, 342, {
+        align: "center",
+        width: pageWidth - 240,
+      });
 
     // =====================================================
     // Score box
@@ -1558,50 +1526,33 @@ const downloadCertificate = async (req, res) => {
     const scoreBoxWidth = 210;
     const scoreBoxHeight = 75;
 
-    const scoreBoxX =
-      centerX - scoreBoxWidth / 2;
+    const scoreBoxX = centerX - scoreBoxWidth / 2;
 
     const scoreBoxY = 375;
 
     doc
       .lineWidth(1.5)
       .strokeColor(GOLD)
-      .roundedRect(
-        scoreBoxX,
-        scoreBoxY,
-        scoreBoxWidth,
-        scoreBoxHeight,
-        10,
-      )
+      .roundedRect(scoreBoxX, scoreBoxY, scoreBoxWidth, scoreBoxHeight, 10)
       .stroke();
 
     doc
       .font("Helvetica-Bold")
       .fontSize(24)
       .fillColor(NAVY)
-      .text(
-        `${score} / ${maximumScore}`,
-        scoreBoxX,
-        scoreBoxY + 13,
-        {
-          align: "center",
-          width: scoreBoxWidth,
-        },
-      );
+      .text(`${score} / ${maximumScore}`, scoreBoxX, scoreBoxY + 13, {
+        align: "center",
+        width: scoreBoxWidth,
+      });
 
     doc
       .font("Helvetica-Bold")
       .fontSize(14)
       .fillColor(GOLD)
-      .text(
-        `${percentage}%`,
-        scoreBoxX,
-        scoreBoxY + 45,
-        {
-          align: "center",
-          width: scoreBoxWidth,
-        },
-      );
+      .text(`${percentage}%`, scoreBoxX, scoreBoxY + 45, {
+        align: "center",
+        width: scoreBoxWidth,
+      });
 
     // =====================================================
     // Achievement message
@@ -1625,15 +1576,10 @@ const downloadCertificate = async (req, res) => {
       .font("Helvetica-Bold")
       .fontSize(11)
       .fillColor(NAVY)
-      .text(
-        "Keep learning and keep growing!",
-        0,
-        483,
-        {
-          align: "center",
-          width: pageWidth,
-        },
-      );
+      .text("Keep learning and keep growing!", 0, 483, {
+        align: "center",
+        width: pageWidth,
+      });
 
     // =====================================================
     // Left signature
@@ -1652,44 +1598,29 @@ const downloadCertificate = async (req, res) => {
       .font("Times-Italic")
       .fontSize(14)
       .fillColor(NAVY)
-      .text(
-        "Princeraj Shaktawat",
-        160,
-        signatureY,
-        {
-          align: "center",
-          width: 190,
-        },
-      );
+      .text("Princeraj Shaktawat", 160, signatureY, {
+        align: "center",
+        width: 190,
+      });
 
     doc
       .font("Helvetica-Bold")
       .fontSize(9)
       .fillColor(TEXT)
-      .text(
-        "FOUNDER",
-        180,
-        signatureY + 32,
-        {
-          align: "center",
-          width: 150,
-          characterSpacing: 1,
-        },
-      );
+      .text("FOUNDER", 180, signatureY + 32, {
+        align: "center",
+        width: 150,
+        characterSpacing: 1,
+      });
 
     doc
       .font("Helvetica")
       .fontSize(8)
       .fillColor(MUTED)
-      .text(
-        "Quizzy",
-        180,
-        signatureY + 47,
-        {
-          align: "center",
-          width: 150,
-        },
-      );
+      .text("Quizzy", 180, signatureY + 47, {
+        align: "center",
+        width: 150,
+      });
 
     // =====================================================
     // Date
@@ -1698,44 +1629,28 @@ const downloadCertificate = async (req, res) => {
     doc
       .lineWidth(0.8)
       .strokeColor("#94a3b8")
-      .moveTo(
-        pageWidth - 330,
-        signatureY + 25,
-      )
-      .lineTo(
-        pageWidth - 180,
-        signatureY + 25,
-      )
+      .moveTo(pageWidth - 330, signatureY + 25)
+      .lineTo(pageWidth - 180, signatureY + 25)
       .stroke();
 
     doc
       .font("Helvetica-Bold")
       .fontSize(10)
       .fillColor(NAVY)
-      .text(
-        submittedDate,
-        pageWidth - 330,
-        signatureY,
-        {
-          align: "center",
-          width: 150,
-        },
-      );
+      .text(submittedDate, pageWidth - 330, signatureY, {
+        align: "center",
+        width: 150,
+      });
 
     doc
       .font("Helvetica-Bold")
       .fontSize(9)
       .fillColor(TEXT)
-      .text(
-        "DATE",
-        pageWidth - 330,
-        signatureY + 32,
-        {
-          align: "center",
-          width: 150,
-          characterSpacing: 1,
-        },
-      );
+      .text("DATE", pageWidth - 330, signatureY + 32, {
+        align: "center",
+        width: 150,
+        characterSpacing: 1,
+      });
 
     // =====================================================
     // Achievement seal
@@ -1749,62 +1664,37 @@ const downloadCertificate = async (req, res) => {
     doc
       .lineWidth(3)
       .strokeColor(GOLD)
-      .circle(
-        sealX,
-        sealY,
-        sealRadius,
-      )
+      .circle(sealX, sealY, sealRadius)
       .stroke();
 
     // Inner seal
     doc
       .lineWidth(1)
       .strokeColor(LIGHT_GOLD)
-      .circle(
-        sealX,
-        sealY,
-        sealRadius - 6,
-      )
+      .circle(sealX, sealY, sealRadius - 6)
       .stroke();
 
     // Star
     const starPoints = [];
 
     for (let i = 0; i < 10; i++) {
-      const angle =
-        -Math.PI / 2 +
-        (i * Math.PI) / 5;
+      const angle = -Math.PI / 2 + (i * Math.PI) / 5;
 
-      const radius =
-        i % 2 === 0 ? 12 : 5;
+      const radius = i % 2 === 0 ? 12 : 5;
 
       starPoints.push([
-        sealX +
-          Math.cos(angle) * radius,
-        sealY +
-          Math.sin(angle) * radius,
+        sealX + Math.cos(angle) * radius,
+        sealY + Math.sin(angle) * radius,
       ]);
     }
 
-    doc
-      .save()
-      .fillColor(GOLD)
-      .moveTo(
-        starPoints[0][0],
-        starPoints[0][1],
-      );
+    doc.save().fillColor(GOLD).moveTo(starPoints[0][0], starPoints[0][1]);
 
     for (let i = 1; i < starPoints.length; i++) {
-      doc.lineTo(
-        starPoints[i][0],
-        starPoints[i][1],
-      );
+      doc.lineTo(starPoints[i][0], starPoints[i][1]);
     }
 
-    doc
-      .closePath()
-      .fill()
-      .restore();
+    doc.closePath().fill().restore();
 
     // =====================================================
     // Footer
@@ -1814,53 +1704,33 @@ const downloadCertificate = async (req, res) => {
       .font("Helvetica-Bold")
       .fontSize(8)
       .fillColor(MUTED)
-      .text(
-        "QUIZZY • CERTIFICATE OF ACHIEVEMENT",
-        0,
-        pageHeight - 42,
-        {
-          align: "center",
-          width: pageWidth,
-          characterSpacing: 1,
-        },
-      );
+      .text("QUIZZY • CERTIFICATE OF ACHIEVEMENT", 0, pageHeight - 42, {
+        align: "center",
+        width: pageWidth,
+        characterSpacing: 1,
+      });
 
     // =====================================================
     // Finish PDF
     // =====================================================
 
-    const safeUsername =
-      username.replace(
-        /[^a-zA-Z0-9-_]/g,
-        "_",
-      );
+    const safeUsername = username.replace(/[^a-zA-Z0-9-_]/g, "_");
 
-    const filename =
-      `Quizzy-Certificate-${safeUsername}.pdf`;
+    const filename = `Quizzy-Certificate-${safeUsername}.pdf`;
 
-    res.setHeader(
-      "Content-Type",
-      "application/pdf",
-    );
+    res.setHeader("Content-Type", "application/pdf");
 
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${filename}"`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
     doc.pipe(res);
 
     doc.end();
   } catch (error) {
-    console.error(
-      "Download certificate error:",
-      error,
-    );
+    console.error("Download certificate error:", error);
 
     if (!res.headersSent) {
       res.status(500).json({
-        message:
-          "Unable to generate certificate.",
+        message: "Unable to generate certificate.",
       });
     }
   }
