@@ -797,50 +797,125 @@ const updateQuiz = async (req, res) => {
       });
     }
 
-    if (!Number.isFinite(numericPositiveMarks) || numericPositiveMarks < 0) {
+    if (
+      !Number.isFinite(numericPositiveMarks) ||
+      numericPositiveMarks < 0
+    ) {
       return res.status(400).json({
         message: "Positive marks cannot be negative.",
       });
     }
 
-    if (!Number.isFinite(numericNegativeMarks) || numericNegativeMarks < 0) {
+    if (
+      !Number.isFinite(numericNegativeMarks) ||
+      numericNegativeMarks < 0
+    ) {
       return res.status(400).json({
         message: "Negative marks cannot be negative.",
       });
     }
 
-    for (const question of questions) {
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+
       if (
-        !question.question ||
-        !Array.isArray(question.options) ||
-        question.options.length !== 4 ||
-        typeof question.correctAnswer !== "number" ||
-        question.correctAnswer < 0 ||
-        question.correctAnswer >= 4
+        !question ||
+        typeof question.question !== "string" ||
+        !question.question.trim()
       ) {
         return res.status(400).json({
-          message: "Invalid question format.",
+          message: `Question ${i + 1} is invalid or empty.`,
         });
       }
 
       if (
-        question.options.some(
-          (option) => typeof option !== "string" || !option.trim(),
-        )
+        typeof question.questionHindi !== "string" ||
+        !question.questionHindi.trim()
       ) {
         return res.status(400).json({
-          message: "All options must be filled.",
+          message: `Hindi question in Question ${i + 1} is required.`,
+        });
+      }
+
+      if (
+        !Array.isArray(question.options) ||
+        question.options.length !== 4
+      ) {
+        return res.status(400).json({
+          message: `Question ${i + 1} must contain exactly 4 options.`,
+        });
+      }
+
+      for (let j = 0; j < question.options.length; j++) {
+        const option = question.options[j];
+
+        const optionLetter = String.fromCharCode(65 + j);
+
+        if (!option || typeof option !== "object") {
+          return res.status(400).json({
+            message: `Option ${optionLetter} in Question ${
+              i + 1
+            } is invalid.`,
+          });
+        }
+
+        if (
+          typeof option.english !== "string" ||
+          !option.english.trim()
+        ) {
+          return res.status(400).json({
+            message: `English text for Option ${optionLetter} in Question ${
+              i + 1
+            } is required.`,
+          });
+        }
+
+        if (
+          typeof option.hindi !== "string" ||
+          !option.hindi.trim()
+        ) {
+          return res.status(400).json({
+            message: `Hindi text for Option ${optionLetter} in Question ${
+              i + 1
+            } is required.`,
+          });
+        }
+      }
+
+      if (
+        typeof question.correctAnswer !== "number" ||
+        !Number.isInteger(question.correctAnswer) ||
+        question.correctAnswer < 0 ||
+        question.correctAnswer > 3
+      ) {
+        return res.status(400).json({
+          message: `Correct answer for Question ${
+            i + 1
+          } must be between A and D.`,
         });
       }
     }
+
+    const normalizedQuestions = questions.map((question) => ({
+      question: question.question.trim(),
+
+      questionHindi: question.questionHindi.trim(),
+
+      options: question.options.map((option) => ({
+        english: option.english.trim(),
+        hindi: option.hindi.trim(),
+      })),
+
+      correctAnswer: question.correctAnswer,
+    }));
 
     quiz.title = title.trim();
     quiz.description = description?.trim() || "";
     quiz.duration = numericDuration;
     quiz.positiveMarks = numericPositiveMarks;
     quiz.negativeMarks = numericNegativeMarks;
-    quiz.questions = questions;
-    quiz.questionCount = questions.length;
+    quiz.questions = normalizedQuestions;
+    quiz.questionCount = normalizedQuestions.length;
 
     await quiz.save();
 
@@ -886,10 +961,16 @@ const getAdminQuiz = async (req, res) => {
         positiveMarks: quiz.positiveMarks,
         negativeMarks: quiz.negativeMarks,
         shareCode: quiz.shareCode,
+
         questions: quiz.questions.map((question) => ({
           id: question._id,
+
           question: question.question,
+
+          questionHindi: question.questionHindi || "",
+
           options: question.options,
+
           correctAnswer: question.correctAnswer,
         })),
       },
