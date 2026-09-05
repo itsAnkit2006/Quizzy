@@ -1159,6 +1159,7 @@ const getParticipantAttempt = async (req, res) => {
       return {
         number: index + 1,
         question: question.question,
+        questionHindi: question.questionHindi || "",
         options: question.options,
         selectedAnswer,
         correctAnswer: question.correctAnswer,
