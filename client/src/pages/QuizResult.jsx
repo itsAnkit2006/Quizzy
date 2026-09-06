@@ -37,8 +37,10 @@ function QuizResult() {
   }, [fetchResult]);
 
   const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
+    const numericSeconds = Number(seconds) || 0;
+
+    const minutes = Math.floor(numericSeconds / 60);
+    const remainingSeconds = numericSeconds % 60;
 
     if (minutes === 0) {
       return `${remainingSeconds}s`;
@@ -57,9 +59,41 @@ function QuizResult() {
     }
 
     return (
-      result?.answers?.filter((answer) => answer.result === activeFilter) || []
+      result?.answers?.filter(
+        (answer) => answer.result === activeFilter,
+      ) || []
     );
   }, [activeFilter, result]);
+
+  const getOptionText = (option) => {
+    if (typeof option === "string") {
+      return {
+        english: option,
+        hindi: "",
+      };
+    }
+
+    return {
+      english: option?.english || "",
+      hindi: option?.hindi || "",
+    };
+  };
+
+  const renderOption = (option) => {
+    const { english, hindi } = getOptionText(option);
+
+    return (
+      <>
+        <p>{english}</p>
+
+        {hindi && (
+          <p className="mt-1 text-sm font-normal opacity-80">
+            {hindi}
+          </p>
+        )}
+      </>
+    );
+  };
 
   if (loading) {
     return (
@@ -67,7 +101,9 @@ function QuizResult() {
         <div className="text-center">
           <div className="mx-auto h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-slate-900" />
 
-          <p className="mt-3 text-sm text-slate-500">Loading your result...</p>
+          <p className="mt-3 text-sm text-slate-500">
+            Loading your result...
+          </p>
         </div>
       </div>
     );
@@ -155,7 +191,9 @@ function QuizResult() {
         {/* Score */}
         <section className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="p-7 text-center sm:p-9">
-            <p className="text-sm font-medium text-slate-500">Your Score</p>
+            <p className="text-sm font-medium text-slate-500">
+              Your Score
+            </p>
 
             <p className="mt-2 text-6xl font-bold tracking-tight text-slate-900 sm:text-7xl">
               {result.score}
@@ -168,7 +206,9 @@ function QuizResult() {
 
           <div className="border-t border-slate-100 bg-slate-50 px-5 py-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Time Taken</span>
+              <span className="text-sm text-slate-500">
+                Time Taken
+              </span>
 
               <span className="font-mono text-sm font-bold text-slate-900">
                 {formatTime(result.timeTaken)}
@@ -182,7 +222,11 @@ function QuizResult() {
           <button
             type="button"
             onClick={() =>
-              setActiveFilter(activeFilter === "correct" ? null : "correct")
+              setActiveFilter(
+                activeFilter === "correct"
+                  ? null
+                  : "correct",
+              )
             }
             className={`rounded-2xl border p-4 text-center shadow-sm transition ${
               activeFilter === "correct"
@@ -198,13 +242,19 @@ function QuizResult() {
               {result.correctAnswers}
             </p>
 
-            <p className="mt-1 text-xs font-medium text-slate-500">Correct</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Correct
+            </p>
           </button>
 
           <button
             type="button"
             onClick={() =>
-              setActiveFilter(activeFilter === "wrong" ? null : "wrong")
+              setActiveFilter(
+                activeFilter === "wrong"
+                  ? null
+                  : "wrong",
+              )
             }
             className={`rounded-2xl border p-4 text-center shadow-sm transition ${
               activeFilter === "wrong"
@@ -220,14 +270,18 @@ function QuizResult() {
               {result.wrongAnswers}
             </p>
 
-            <p className="mt-1 text-xs font-medium text-slate-500">Wrong</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Wrong
+            </p>
           </button>
 
           <button
             type="button"
             onClick={() =>
               setActiveFilter(
-                activeFilter === "unanswered" ? null : "unanswered",
+                activeFilter === "unanswered"
+                  ? null
+                  : "unanswered",
               )
             }
             className={`rounded-2xl border p-4 text-center shadow-sm transition ${
@@ -244,7 +298,9 @@ function QuizResult() {
               {result.unanswered}
             </p>
 
-            <p className="mt-1 text-xs font-medium text-slate-500">Skipped</p>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Skipped
+            </p>
           </button>
         </section>
 
@@ -267,7 +323,8 @@ function QuizResult() {
                   {activeFilter === "unanswered" &&
                     "Showing questions you skipped."}
 
-                  {activeFilter === "all" && "Review all of your answers."}
+                  {activeFilter === "all" &&
+                    "Review all of your answers."}
                 </p>
               </div>
 
@@ -291,11 +348,26 @@ function QuizResult() {
                 </div>
               ) : (
                 filteredAnswers.map((answer) => {
-                  const isCorrect = answer.result === "correct";
+                  const isCorrect =
+                    answer.result === "correct";
 
-                  const isWrong = answer.result === "wrong";
+                  const isWrong =
+                    answer.result === "wrong";
 
-                  const isUnanswered = answer.result === "unanswered";
+                  const isUnanswered =
+                    answer.result === "unanswered";
+
+                  const selectedOption =
+                    !isUnanswered &&
+                    answer.selectedAnswer !== null &&
+                    answer.options?.[
+                      answer.selectedAnswer
+                    ];
+
+                  const correctOption =
+                    answer.options?.[
+                      answer.correctAnswer
+                    ];
 
                   return (
                     <div
@@ -312,6 +384,12 @@ function QuizResult() {
                           <p className="text-sm font-semibold leading-6 text-slate-900">
                             {answer.question}
                           </p>
+
+                          {answer.questionHindi && (
+                            <p className="mt-1 text-sm leading-6 text-slate-500">
+                              {answer.questionHindi}
+                            </p>
+                          )}
                         </div>
 
                         <span
@@ -351,13 +429,19 @@ function QuizResult() {
                                 : "border-red-200 bg-red-50"
                             }`}
                           >
-                            <p
+                            <div
                               className={`text-sm font-medium ${
-                                isCorrect ? "text-green-700" : "text-red-700"
+                                isCorrect
+                                  ? "text-green-700"
+                                  : "text-red-700"
                               }`}
                             >
-                              {answer.options[answer.selectedAnswer]}
-                            </p>
+                              {selectedOption
+                                ? renderOption(
+                                      selectedOption,
+                                  )
+                                : "Answer unavailable"}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -370,9 +454,13 @@ function QuizResult() {
                           </p>
 
                           <div className="mt-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
-                            <p className="text-sm font-medium text-green-700">
-                              {answer.options[answer.correctAnswer]}
-                            </p>
+                            <div className="text-sm font-medium text-green-700">
+                              {correctOption
+                                ? renderOption(
+                                      correctOption,
+                                  )
+                                : "Answer unavailable"}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -386,11 +474,15 @@ function QuizResult() {
 
         {/* Summary */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-bold text-slate-900">Attempt Summary</h2>
+          <h2 className="text-sm font-bold text-slate-900">
+            Attempt Summary
+          </h2>
 
           <div className="mt-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Correct answers</span>
+              <span className="text-sm text-slate-500">
+                Correct answers
+              </span>
 
               <span className="text-sm font-semibold text-slate-900">
                 {result.correctAnswers}
@@ -398,7 +490,9 @@ function QuizResult() {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Wrong answers</span>
+              <span className="text-sm text-slate-500">
+                Wrong answers
+              </span>
 
               <span className="text-sm font-semibold text-slate-900">
                 {result.wrongAnswers}
@@ -406,7 +500,9 @@ function QuizResult() {
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">Unanswered</span>
+              <span className="text-sm text-slate-500">
+                Unanswered
+              </span>
 
               <span className="text-sm font-semibold text-slate-900">
                 {result.unanswered}
@@ -430,7 +526,12 @@ function QuizResult() {
         {/* Actions */}
         <div className="mt-6 space-y-3">
           <button
-            onClick={() => navigate(`/quiz/${shareCode}/leaderboard`)}
+            type="button"
+            onClick={() =>
+              navigate(
+                `/quiz/${shareCode}/leaderboard`,
+              )
+            }
             className="w-full rounded-xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.99]"
           >
             View Leaderboard →

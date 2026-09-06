@@ -604,16 +604,21 @@ const getAttemptResult = async (req, res) => {
 
     const answers = quiz.questions.map((question, index) => {
       const submitted = attempt.answers.find(
-        (answer) => String(answer.questionId) === String(question._id),
+        (answer) =>
+          String(answer.questionId) ===
+          String(question._id),
       );
 
-      const selectedAnswer = submitted?.selectedAnswer ?? null;
+      const selectedAnswer =
+        submitted?.selectedAnswer ?? null;
 
       let result = "unanswered";
 
       if (selectedAnswer !== null) {
         result =
-          selectedAnswer === question.correctAnswer ? "correct" : "wrong";
+          selectedAnswer === question.correctAnswer
+            ? "correct"
+            : "wrong";
       }
 
       return {
@@ -621,11 +626,15 @@ const getAttemptResult = async (req, res) => {
 
         question: question.question,
 
+        questionHindi:
+          question.questionHindi || "",
+
         options: question.options,
 
         selectedAnswer,
 
-        correctAnswer: question.correctAnswer,
+        correctAnswer:
+          question.correctAnswer,
 
         result,
       };
@@ -634,25 +643,34 @@ const getAttemptResult = async (req, res) => {
     res.json({
       result: {
         attemptId: attempt._id,
+
         quizTitle: quiz.title,
 
-        correctAnswers: attempt.correctAnswers,
+        correctAnswers:
+          attempt.correctAnswers,
 
-        wrongAnswers: attempt.wrongAnswers,
+        wrongAnswers:
+          attempt.wrongAnswers,
 
-        unanswered: attempt.unanswered,
+        unanswered:
+          attempt.unanswered,
 
         score: attempt.score,
 
-        timeTaken: attempt.timeTaken,
+        timeTaken:
+          attempt.timeTaken,
 
-        submittedAt: attempt.submittedAt,
+        submittedAt:
+          attempt.submittedAt,
 
         answers,
       },
     });
   } catch (error) {
-    console.error("Get result error:", error);
+    console.error(
+      "Get result error:",
+      error,
+    );
 
     res.status(500).json({
       message: "Unable to load result.",
@@ -666,7 +684,7 @@ const getMyResults = async (req, res) => {
       user: req.user._id,
       status: "completed",
     })
-      .populate("quiz", "title shareCode duration positiveMarks negativeMarks")
+      .populate("quiz", "title shareCode")
       .sort({ submittedAt: -1 })
       .lean();
 

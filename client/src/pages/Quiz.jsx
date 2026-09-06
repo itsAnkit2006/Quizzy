@@ -17,14 +17,13 @@ function Quiz() {
         setNotFound(false);
 
         try {
-            const response = await api.get(
-                `/quizzes/${shareCode}`
-            );
+            const response = await api.get(`/quizzes/${shareCode}`);
 
             setQuiz(response.data.quiz);
         } catch (error) {
             if (error.response?.status === 404) {
                 setNotFound(true);
+
                 setError(
                     error.response?.data?.message ||
                         "This quiz may have been deleted or the link is incorrect."
@@ -63,7 +62,6 @@ function Quiz() {
         return (
             <div className="flex min-h-screen items-center justify-center bg-slate-50 px-5">
                 <div className="w-full max-w-md text-center">
-
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-xl font-bold text-slate-500">
                         ?
                     </div>
@@ -86,27 +84,28 @@ function Quiz() {
                             disabled={loading}
                             className="mt-6 rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {loading
-                                ? "Retrying..."
-                                : "Try Again"}
+                            {loading ? "Retrying..." : "Try Again"}
                         </button>
                     )}
 
                     <Link
                         to="/"
                         className={`${
-                            notFound
-                                ? "mt-6"
-                                : "mt-3"
+                            notFound ? "mt-6" : "mt-3"
                         } inline-block rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50`}
                     >
                         Go Home
                     </Link>
-
                 </div>
             </div>
         );
     }
+
+    const questionCount =
+        quiz.questionCount ?? quiz.questions?.length ?? 0;
+
+    const positiveMarks = quiz.positiveMarks ?? 1;
+    const negativeMarks = quiz.negativeMarks ?? 0;
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -123,7 +122,6 @@ function Quiz() {
 
             <main className="mx-auto max-w-2xl px-5 py-8">
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-
                     <p className="text-sm font-medium text-slate-500">
                         Quiz
                     </p>
@@ -139,14 +137,13 @@ function Quiz() {
                     )}
 
                     <div className="mt-6 grid grid-cols-2 gap-3">
-
                         <div className="rounded-xl bg-slate-50 p-4">
                             <p className="text-xs text-slate-500">
                                 Questions
                             </p>
 
                             <p className="mt-1 text-lg font-bold text-slate-900">
-                                {quiz.questionCount}
+                                {questionCount}
                             </p>
                         </div>
 
@@ -166,7 +163,7 @@ function Quiz() {
                             </p>
 
                             <p className="mt-1 text-lg font-bold text-slate-900">
-                                +{quiz.positiveMarks}
+                                +{positiveMarks}
                             </p>
                         </div>
 
@@ -176,10 +173,9 @@ function Quiz() {
                             </p>
 
                             <p className="mt-1 text-lg font-bold text-slate-900">
-                                -{quiz.negativeMarks}
+                                -{negativeMarks}
                             </p>
                         </div>
-
                     </div>
 
                     <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -193,26 +189,26 @@ function Quiz() {
                             </li>
 
                             <li>
-                                • The quiz will be submitted automatically when time expires.
+                                • The quiz will be submitted automatically
+                                when time expires.
                             </li>
 
                             <li>
-                                • Make sure you have a stable internet connection.
+                                • Make sure you have a stable internet
+                                connection.
                             </li>
                         </ul>
                     </div>
 
                     <button
+                        type="button"
                         onClick={() =>
-                            navigate(
-                                `/quiz/${shareCode}/attempt`
-                            )
+                            navigate(`/quiz/${shareCode}/attempt`)
                         }
                         className="mt-6 w-full rounded-xl bg-slate-900 px-5 py-4 text-sm font-semibold text-white transition hover:bg-slate-800"
                     >
                         Start Quiz
                     </button>
-
                 </div>
             </main>
         </div>

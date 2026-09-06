@@ -74,43 +74,46 @@ router.delete(
 );
 
 // =========================================================
-// Public
-// =========================================================
-
-router.get("/:shareCode", getQuizByShareCode);
-
-// =========================================================
 // Participant
 // =========================================================
 
 router.get(
-  "/my/results",
-  protect,
-  getMyResults,
+    "/my/results",
+    protect,
+    getMyResults,
 );
 
 router.post(
-  "/:shareCode/start",
-  protect,
-  startQuiz,
+    "/:shareCode/start",
+    protect,
+    startQuiz,
 );
 
 router.post(
-  "/:shareCode/submit",
-  protect,
-  submitQuiz,
+    "/:shareCode/submit",
+    protect,
+    submitQuiz,
 );
 
 router.get(
-  "/:shareCode/result/:attemptId",
-  protect,
-  getAttemptResult,
+    "/:shareCode/result/:attemptId",
+    protect,
+    getAttemptResult,
 );
 
 router.get(
-  "/:shareCode/leaderboard",
-  protect,
-  getLeaderboard,
+    "/:shareCode/leaderboard",
+    protect,
+    getLeaderboard,
+);
+
+// =========================================================
+// Public
+// =========================================================
+
+router.get(
+    "/:shareCode",
+    getQuizByShareCode,
 );
 
 module.exports = router;
